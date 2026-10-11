@@ -1,0 +1,57 @@
+# Secrets / local env
+.env
+*.env
+*.local
+*.secret
+*secret*
+*token*
+*key*
+auth.json
+*auth*.json
+
+# AI provider auth/profile state
+.ai_profiles/
+.codex/
+.codex_profiles/
+.claude/
+.gemini/
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Runtime state
+runtime/
+logs/
+tmp/
+temp/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# JS/build
+node_modules/
+dist/
+build/
+.next/
+.vite/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Python packaging generated metadata
+*.egg-info/
+*.dist-info/

@@ -1,0 +1,25 @@
+[Unit]
+Description=AI Session Control Center backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__CUS_USER__
+Group=__CUS_GROUP__
+WorkingDirectory=__CUS_ROOT__/backend/ai-account-manager
+EnvironmentFile=__CUS_ENV_FILE__
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+ExecStart=/usr/bin/env -u VIRTUAL_ENV __UV_BIN__ run --frozen python -m uvicorn ai_account_manager.main:app --host 127.0.0.1 --port 8710 --no-access-log
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

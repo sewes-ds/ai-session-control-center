@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0f172a">
+  <title>Центр управления сессиями</title>
+  <link rel="stylesheet" href="./assets/app.css?v=cus-runtime-onboarding-v1">
+  <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+  <script defer src="./assets/app.js?v=cus-runtime-authority-v1"></script>
+</head>
+<body>
+  <main id="topicOnboarding" class="onboarding-shell is-hidden" aria-labelledby="topicOnboardingTitle">
+    <header class="onboarding-header">
+      <p class="eyebrow">ЦУС</p>
+      <h1 id="topicOnboardingTitle">Настройка проекта</h1>
+      <p>Выберите каталог и параметры запуска для этого Telegram-топика.</p>
+    </header>
+
+    <section class="onboarding-card">
+      <div class="settings-summary">
+        <div class="settings-summary-row">
+          <span>Топик</span>
+          <strong id="onboardingTopicName">Загрузка…</strong>
+        </div>
+        <div class="settings-summary-row">
+          <span>Состояние</span>
+          <strong id="onboardingState">Проверяем доступ</strong>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Каталог проекта</span>
+        <input id="onboardingProjectPath" type="text" list="onboardingProjectPaths" inputmode="text" autocomplete="off" placeholder="/srv/projects/example">
+        <datalist id="onboardingProjectPaths"></datalist>
+        <small>Выберите существующий проект из списка или укажите разрешённый абсолютный путь.</small>
+      </label>
+
+      <label class="field">
+        <span>Аккаунт</span>
+        <select id="onboardingAccount"></select>
+      </label>
+
+      <label class="field">
+        <span>Модель</span>
+        <select id="onboardingModel"></select>
+        <small id="onboardingModelHelp">Модели загружаются из capabilities выбранного аккаунта.</small>
+      </label>
+
+      <label class="field">
+        <span>Reasoning</span>
+        <select id="onboardingReasoning"></select>
+        <small id="onboardingReasoningHelp">Доступные значения зависят от модели.</small>
+      </label>
+
+      <button id="onboardingRefreshCapabilities" class="button button-secondary button-compact refresh-models-button" type="button">
+        Обновить модели
+      </button>
+
+      <div id="onboardingNotice" class="notice is-hidden" role="status" aria-live="polite"></div>
+      <div id="onboardingError" class="notice notice-error is-hidden" role="alert"></div>
+
+      <button id="onboardingApply" class="button button-primary onboarding-submit" type="button" disabled>
+        Применить настройки
+      </button>
+    </section>
+  </main>
+
+  <div id="mainApplication" class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">ЦУС</p>
+        <h1>Центр управления сессиями</h1>
+      </div>
+      <button id="refreshButton" class="icon-button" type="button" aria-label="Обновить лимиты всех аккаунтов" title="Обновить лимиты всех аккаунтов">
+        <span aria-hidden="true">↻</span>
+      </button>
+    </header>
+
+    <nav class="tabs" aria-label="Разделы">
+      <button class="tab is-active" type="button" data-tab="accounts">Аккаунты</button>
+      <button class="tab" type="button" data-tab="projects">Проекты</button>
+    </nav>
+
+    <section id="upgradeStrip" class="upgrade-strip" role="status" aria-live="polite">
+      <span class="upgrade-copy">
+        <span id="upgradeStatusText">Загрузка сведений о Codex…</span>
+        <small id="upgradeMaintenanceText" class="is-hidden"></small>
+      </span>
+      <button id="upgradeActionButton" class="button button-primary button-compact is-hidden" type="button"></button>
+    </section>
+
+    <main>
+      <section id="authRecoveryNotice" class="auth-recovery notice notice-error is-hidden" role="alert">
+        <h2>Не удалось получить авторизацию Telegram</h2>
+        <p>Закройте Mini App и откройте его заново из сообщения CUS-бота.
+          Можно также повторить проверку авторизации.</p>
+        <button id="retryAuthButton" class="button button-secondary" type="button">Повторить проверку</button>
+      </section>
+
+      <section id="accountsPanel" class="panel is-active" aria-labelledby="accountsHeading">
+        <div class="section-heading section-heading-with-action">
+          <div>
+            <h2 id="accountsHeading">Аккаунты</h2>
+            <p>Авторизация и лимиты агентов</p>
+          </div>
+          <button id="addAccountButton" class="button button-primary button-compact" type="button">
+            Добавить
+          </button>
+        </div>
+        <div id="accountsStatus" class="notice is-hidden" role="status"></div>
+        <div id="accountsList" class="card-list" aria-live="polite"></div>
+      </section>
+
+      <section id="projectsPanel" class="panel" aria-labelledby="projectsHeading">
+        <div class="section-heading">
+          <div>
+            <h2 id="projectsHeading">Проекты</h2>
+            <p>Топики тмукс-бота и состояние их сессий</p>
+          </div>
+        </div>
+        <div id="projectsStatus" class="notice is-hidden" role="status"></div>
+        <div id="projectsList" class="card-list" aria-live="polite"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="accountDialog" class="dialog-backdrop is-hidden" role="dialog" aria-modal="true" aria-labelledby="accountDialogTitle">
+    <section class="dialog-card">
+      <div id="accountCreateStep">
+        <p class="eyebrow">Codex</p>
+        <h2 id="accountDialogTitle">Добавить аккаунт</h2>
+        <p class="dialog-copy">ЦУС создаст профиль и запустит штатную авторизацию Codex. Пароль OpenAI не вводится и не хранится.</p>
+
+        <label class="field">
+          <span>Код аккаунта</span>
+          <input id="accountSlugInput" type="text" inputmode="latin" autocomplete="off" placeholder="codex_b" maxlength="64">
+          <small>Латинские буквы, цифры, дефис и подчёркивание.</small>
+        </label>
+
+        <label class="field">
+          <span>Название</span>
+          <input id="accountLabelInput" type="text" autocomplete="off" placeholder="Рабочий аккаунт" maxlength="120">
+          <small>Необязательно.</small>
+        </label>
+
+        <div id="accountCreateError" class="notice notice-error is-hidden" role="alert"></div>
+
+        <div class="dialog-actions">
+          <button id="startEnrollmentButton" class="button button-primary" type="button">Авторизовать</button>
+          <button class="button button-secondary" type="button" data-close-dialog>Назад</button>
+        </div>
+      </div>
+
+      <div id="accountEnrollStep" class="is-hidden">
+        <p class="eyebrow">Штатная авторизация</p>
+        <h2>Войдите в Codex</h2>
+        <p class="dialog-copy">Откройте официальный адрес и введите одноразовый код. ЦУС не получает пароль.</p>
+
+        <div class="auth-code-card">
+          <span>Одноразовый код</span>
+          <strong id="enrollmentUserCode">—</strong>
+          <button id="copyCodeButton" class="button button-secondary button-compact" type="button">Копировать код</button>
+        </div>
+
+        <a id="enrollmentLink" class="button button-primary button-link" href="#" target="_blank" rel="noopener noreferrer">Открыть страницу входа</a>
+
+        <div class="progress-row">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="enrollmentStatusText">Ожидаем завершения авторизации…</span>
+        </div>
+
+        <div id="accountEnrollError" class="notice notice-error is-hidden" role="alert"></div>
+
+        <div class="dialog-actions">
+          <button id="cancelEnrollmentButton" class="button button-secondary" type="button">Отменить</button>
+          <button class="button button-secondary" type="button" data-close-dialog>Закрыть</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+
+  <div id="resetCreditDialog" class="dialog-backdrop is-hidden" role="dialog" aria-modal="true" aria-labelledby="resetCreditDialogTitle">
+    <section class="dialog-card">
+      <p class="eyebrow">Codex</p>
+      <h2 id="resetCreditDialogTitle">Использовать сохранённый сброс</h2>
+      <div id="resetCreditSummary" class="confirmation-copy"></div>
+      <div id="resetCreditError" class="notice notice-error is-hidden" role="alert"></div>
+      <div class="dialog-actions">
+        <button id="confirmResetCreditButton" class="button button-primary" type="button">Использовать сброс</button>
+        <button id="cancelResetCreditButton" class="button button-secondary" type="button">Отмена</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="archiveDialog" class="dialog-backdrop is-hidden" role="dialog" aria-modal="true" aria-labelledby="archiveDialogTitle">
+    <section class="dialog-card">
+      <p class="eyebrow">Архив</p>
+      <h2 id="archiveDialogTitle">Отправить проект в Архив</h2>
+      <div id="archiveSummary" class="confirmation-copy"></div>
+      <div id="archiveError" class="notice notice-error is-hidden" role="alert"></div>
+      <div class="dialog-actions">
+        <button id="confirmArchiveButton" class="button button-primary" type="button">Отправить проект в Архив</button>
+        <button id="cancelArchiveButton" class="button button-secondary" type="button">Отмена</button>
+      </div>
+    </section>
+  </div>
+
+
+  <div id="projectSettingsDialog" class="dialog-backdrop is-hidden" role="dialog" aria-modal="true" aria-labelledby="projectSettingsDialogTitle">
+    <section class="dialog-card">
+      <div id="settingsPathStep" class="is-hidden">
+        <p class="eyebrow">Новый проект</p>
+        <h2>Привязать каталог</h2>
+        <p class="dialog-copy">Укажите существующий серверный каталог проекта. До завершения всей настройки Codex не запускается.</p>
+        <label class="field">
+          <span>Абсолютный путь</span>
+          <input id="settingsPathInput" type="text" inputmode="text" autocomplete="off" placeholder="/srv/projects/example">
+          <small>Разрешены только каталоги внутри настроенных owner roots.</small>
+        </label>
+        <div id="settingsPathError" class="notice notice-error is-hidden" role="alert"></div>
+        <div class="dialog-actions">
+          <button id="bindProjectPathButton" class="button button-primary" type="button">Привязать путь</button>
+          <button class="button button-secondary" type="button" data-close-settings-dialog>Отмена</button>
+        </div>
+      </div>
+
+      <div id="settingsEditStep" class="is-hidden">
+        <p class="eyebrow">Codex</p>
+        <h2 id="projectSettingsDialogTitle">Настроить запуск</h2>
+
+        <div class="settings-summary">
+          <div class="settings-summary-row">
+            <span>Проект</span>
+            <strong id="settingsProjectTopic">—</strong>
+          </div>
+          <div class="settings-summary-row">
+            <span>Путь</span>
+            <strong id="settingsProjectPath">—</strong>
+          </div>
+          <div class="settings-summary-row">
+            <span>Назначение</span>
+            <strong id="settingsRuntimeStatus">Настройки следующего запуска</strong>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Аккаунт</span>
+          <select id="settingsAccountSelect"></select>
+        </label>
+
+        <label class="field">
+          <span>Модель</span>
+          <select id="settingsModelSelect"></select>
+          <small id="settingsModelHelp"></small>
+        </label>
+
+        <label class="field">
+          <span>Reasoning</span>
+          <select id="settingsReasoningSelect"></select>
+          <small id="settingsReasoningHelp"></small>
+        </label>
+
+        <button id="refreshCapabilitiesButton" class="button button-secondary button-compact refresh-models-button" type="button">
+          Обновить модели
+        </button>
+
+        <div id="settingsEditNotice" class="notice is-hidden" role="status"></div>
+        <div id="settingsEditError" class="notice notice-error is-hidden" role="alert"></div>
+
+        <div class="dialog-actions">
+          <button id="openApplyConfirmationButton" class="button button-primary" type="button">Применить</button>
+          <button class="button button-secondary" type="button" data-close-settings-dialog>Отмена</button>
+        </div>
+      </div>
+
+      <div id="settingsConfirmStep" class="is-hidden">
+        <p class="eyebrow">Подтверждение</p>
+        <h2>Подтвердите настройки</h2>
+        <div class="confirmation-copy">
+          <div id="settingsConfirmSummary" class="confirmation-summary"></div>
+          <p id="settingsConfirmPrimaryCopy">После подтверждения проект будет запущен с выбранными настройками.</p>
+          <p id="settingsConfirmSecondaryCopy">Текущая задача и очередь проекта, если они есть, будут прерваны.</p>
+        </div>
+
+        <div id="settingsConfirmError" class="notice notice-error is-hidden" role="alert"></div>
+
+        <div class="dialog-actions">
+          <button id="confirmApplySettingsButton" class="button button-primary" type="button">Подтвердить</button>
+          <button id="backToSettingsEditButton" class="button button-secondary" type="button">Назад</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <template id="emptyStateTemplate">
+    <div class="empty-state">
+      <div class="empty-icon" aria-hidden="true">—</div>
+      <h3></h3>
+      <p></p>
+    </div>
+  </template>
+</body>
+</html>

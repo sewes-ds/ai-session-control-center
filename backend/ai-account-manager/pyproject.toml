@@ -1,0 +1,46 @@
+[project]
+name = "ai-account-manager"
+version = "0.1.0"
+description = "Provider-agnostic AI account, quota and profile manager"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "pydantic>=2.7.0",
+  "httpx>=0.27.0",
+]
+
+[project.scripts]
+cus-codex-compatibility-gate = "ai_account_manager.providers.codex.compatibility_gate_runner:main"
+cus-codex-engineering-session = "ai_account_manager.providers.codex.engineering_session_runner:main"
+cus-codex-activation = "ai_account_manager.providers.codex.activation_runner:main"
+cus-codex-engineering-worker = "ai_account_manager.providers.codex.upgrade_engineering_worker:main"
+cus-codex-real-canary-worker = "ai_account_manager.providers.codex.upgrade_real_canary_worker:main"
+cus-codex-fixture-tui = "ai_account_manager.providers.codex.upgrade_fixture_codex_tui:main"
+cus-codex-managed-profile-update = "ai_account_manager.providers.codex.managed_profile_update:main"
+cus-codex-reasoning-contract-reconcile = "ai_account_manager.providers.codex.reasoning_contract:main"
+cus-upgrade-retention-sweep = "ai_account_manager.providers.codex.upgrade_retention_sweep:main"
+cus-upgrade-retention-qualify = "ai_account_manager.providers.codex.upgrade_retention_qualification:main"
+cus-runtime-migration-import = "ai_account_manager.runtime_migration_importer:main"
+cus-runtime-agent-instance = "ai_account_manager.runtime_agent_instance:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.5.0",
+  "httpx2>=2.4.0,<3.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
