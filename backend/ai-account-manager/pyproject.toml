@@ -2,6 +2,7 @@
 name = "ai-account-manager"
 version = "0.1.0"
 description = "Provider-agnostic AI account, quota and profile manager"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",

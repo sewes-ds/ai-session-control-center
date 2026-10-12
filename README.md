@@ -59,3 +59,9 @@ node --check frontend/telegram-miniapp/assets/app.js
 
 The companion runtime is maintained in
 [`SeweS01/ai-agent-runtime`](https://github.com/SeweS01/ai-agent-runtime).
+
+## Contributing and license
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Report security
+issues according to [SECURITY.md](SECURITY.md). This project is available under the
+[MIT License](LICENSE), Copyright (c) 2026 SeweS-DS.
