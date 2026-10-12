@@ -11,6 +11,11 @@ dependencies = [
   "httpx>=0.27.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/sewes-ds/ai-session-control-center"
+Repository = "https://github.com/sewes-ds/ai-session-control-center.git"
+Issues = "https://github.com/sewes-ds/ai-session-control-center/issues"
+
 [project.scripts]
 cus-codex-compatibility-gate = "ai_account_manager.providers.codex.compatibility_gate_runner:main"
 cus-codex-engineering-session = "ai_account_manager.providers.codex.engineering_session_runner:main"

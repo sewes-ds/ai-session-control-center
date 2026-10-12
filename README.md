@@ -1,5 +1,8 @@
 # AI Session Control Center
 
+[![CI](https://github.com/sewes-ds/ai-session-control-center/actions/workflows/ci.yml/badge.svg)](https://github.com/sewes-ds/ai-session-control-center/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 AI Session Control Center (CUS) is a provider-agnostic control plane for AI CLI
 agents. It manages projects, provider accounts, desired model settings, Telegram
 topic onboarding, and synchronization with a separate local runtime.
@@ -58,7 +61,7 @@ node --check frontend/telegram-miniapp/assets/app.js
 ```
 
 The companion runtime is maintained in
-[`SeweS01/ai-agent-runtime`](https://github.com/SeweS01/ai-agent-runtime).
+[`sewes-ds/ai-agent-runtime`](https://github.com/sewes-ds/ai-agent-runtime).
 
 ## Contributing and license
 

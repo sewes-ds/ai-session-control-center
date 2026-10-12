@@ -1,7 +1,7 @@
 # AI Agent Runtime V1 integration
 
 CUS communicates with the separate
-[`ai-agent-runtime`](https://github.com/SeweS01/ai-agent-runtime) service through a
+[`ai-agent-runtime`](https://github.com/sewes-ds/ai-agent-runtime) service through a
 framed, protocol-major-versioned Unix-socket adapter. Neither repository imports
 the other, and CUS does not patch the Telegram Agent.
 
