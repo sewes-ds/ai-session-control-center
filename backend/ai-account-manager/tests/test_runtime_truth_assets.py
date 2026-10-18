@@ -70,9 +70,11 @@ def test_running_and_stopped_runtime_truth_ui_contract() -> None:
     assert "project.current_model" in running
     assert "project.current_reasoning_effort" in running
     assert "project.runtime_model" not in running
-    assert "project.model" not in running
+    assert "project.model" in running
+    assert 'health === "PENDING_CHANGE"' in running
     assert "Текущая модель не определена" in running
     assert "Текущие параметры" in running
+    assert "После переключения" in running
     assert "project.model" in stopped
     assert "project.reasoning_effort" in stopped
     assert "При следующем запуске" in stopped
@@ -102,5 +104,5 @@ def test_runtime_truth_asset_version_is_deterministic() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
 
     assert './assets/app.css?v=cus-runtime-onboarding-v1' in html
-    assert './assets/app.js?v=cus-runtime-authority-v1' in html
+    assert './assets/app.js?v=cus-runtime-model-switch-v1' in html
     assert 'https://telegram.org/js/telegram-web-app.js?63' in html

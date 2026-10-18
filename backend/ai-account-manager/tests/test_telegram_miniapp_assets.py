@@ -230,7 +230,7 @@ def test_cache_busting_query_is_deterministic() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
 
     assert "./assets/app.css?v=cus-runtime-onboarding-v1" in html
-    assert "./assets/app.js?v=cus-runtime-authority-v1" in html
+    assert "./assets/app.js?v=cus-runtime-model-switch-v1" in html
     assert "?v=" in html
     assert "Date.now()" not in html
 
@@ -243,17 +243,23 @@ def test_runtime_managed_project_uses_runtime_as_authority() -> None:
     assert 'onboarding_state: managedDesired ? "CONFIGURED"' in merge
     assert "tmux_session_running: managedDesired ? runtimeRunning" in merge
     assert "activity_status: managedDesired ? runtimeActivity" in merge
-    assert "revision.spec_digest === managedDesired.spec_digest" in merge
-    assert 'runtime_selection_status: desiredIsApplied ? "current"' in merge
-    assert 'agent: managedDesired?.provider || project.agent' in merge
+    assert "currentApplied.spec_digest === managedDesired.spec_digest" in merge
+    assert 'runtime_selection_status: currentApplied ? "current"' in merge
+    assert "current_model: currentApplied?.model" in merge
+    assert "current_reasoning_effort: currentApplied?.reasoning_effort" in merge
+    assert "agent: managedDesired?.provider || project.agent" in merge
 
     assert 'binding.lifecycle_status === "CONFIGURED"' in javascript
-    assert 'projectsResponse.integration?.status !== "compatible" && !state.runtimeManaged' in javascript
+    assert (
+        'projectsResponse.integration?.status !== "compatible" && !state.runtimeManaged'
+        in javascript
+    )
 
     card = _javascript_function(javascript, "projectCard")
     assert 'running ? "Активна (Runtime V1)" : "Не запущена"' in card
     assert "Лимиты аккаунта" in javascript
     assert "Codex управляется Runtime V1" in javascript
+    assert "После переключения" in javascript
 
 
 def test_check_failed_copy_reports_completed_failure() -> None:
@@ -341,7 +347,10 @@ def test_quota_ui_uses_remaining_values_with_bounded_initial_refresh() -> None:
     assert "remaining_percent" in javascript
     assert "quota.windows" in javascript
     assert "Минимально осталось" not in javascript
-    assert "Общий лимит аккаунта ${escapeHtml(accountLabel(accountSlug))} и модели, не личный лимит проекта" in javascript
+    assert (
+        "Общий лимит аккаунта ${escapeHtml(accountLabel(accountSlug))} и модели, не личный лимит проекта"
+        in javascript
+    )
     assert "Модель: ${escapeHtml(model)} · Бакет: ${escapeHtml(bucket)}" in javascript
     assert "refreshInitialAccountQuotas" in javascript
     assert javascript.count("/quota/refresh") == 1

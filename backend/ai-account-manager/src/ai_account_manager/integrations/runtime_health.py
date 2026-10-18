@@ -12,6 +12,7 @@ from ai_account_manager.integrations.ai_agent_runtime import (
 )
 from ai_account_manager.schemas.runtime_control import AgentInstanceRecord, RuntimeBindingRecord
 from ai_account_manager.schemas.runtime_health import (
+    RuntimeAppliedPublic,
     RuntimeAgentHealthPublic,
     RuntimeBindingHealthPublic,
     RuntimeBindingHealthResponse,
@@ -62,6 +63,36 @@ def _revision(value: object) -> RuntimeRevisionPublic | None:
             generation_id=generation,
             revision=revision,
             spec_digest=digest,
+        )
+    except ValueError:
+        return None
+
+
+def _applied_revision(value: object) -> RuntimeAppliedPublic | None:
+    revision = _revision(value)
+    if revision is None or not isinstance(value, dict):
+        return None
+    effective = value.get("effective")
+    if not isinstance(effective, dict):
+        return None
+    provider = effective.get("provider")
+    account_profile = effective.get("account_profile")
+    model = effective.get("actual_model")
+    reasoning_effort = effective.get("actual_reasoning_effort")
+    if not all(
+        isinstance(item, str) and item
+        for item in (provider, account_profile, model, reasoning_effort)
+    ):
+        return None
+    try:
+        return RuntimeAppliedPublic(
+            generation_id=revision.generation_id,
+            revision=revision.revision,
+            spec_digest=revision.spec_digest,
+            provider=provider,
+            account_profile=account_profile,
+            model=model,
+            reasoning_effort=reasoning_effort,
         )
     except ValueError:
         return None
@@ -129,7 +160,7 @@ def _public_binding(
     runtime_desired = _revision(runtime.get("desired")) if runtime is not None else None
     active_instances = 0
     active_lifecycles: list[str] = []
-    applied_by_digest: dict[str, RuntimeRevisionPublic] = {}
+    applied_by_digest: dict[str, RuntimeAppliedPublic] = {}
     raw_instances = runtime.get("instances") if runtime is not None else None
     if isinstance(raw_instances, list):
         for instance in raw_instances:
@@ -142,7 +173,7 @@ def _public_binding(
             lifecycle = instance.get("lifecycle")
             if isinstance(lifecycle, str):
                 active_lifecycles.append(lifecycle)
-            applied = _revision(instance.get("applied"))
+            applied = _applied_revision(instance.get("applied"))
             if applied is not None:
                 applied_by_digest[applied.spec_digest] = applied
     management_mode = runtime.get("management_mode") if runtime is not None else None

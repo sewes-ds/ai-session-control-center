@@ -113,6 +113,13 @@ def test_public_health_correlates_binding_and_drops_process_internals(tmp_path: 
                                 "generation_id": "gen-1",
                                 "revision": 2,
                                 "spec_digest": f"sha256:{'2' * 64}",
+                                "effective": {
+                                    "provider": "codex",
+                                    "account_profile": "codex_b",
+                                    "actual_model": "gpt-old",
+                                    "actual_reasoning_effort": "high",
+                                    "real_codex_path": "/must/not/leak",
+                                },
                             },
                         },
                         {
@@ -124,6 +131,12 @@ def test_public_health_correlates_binding_and_drops_process_internals(tmp_path: 
                                 "generation_id": "gen-1",
                                 "revision": 1,
                                 "spec_digest": f"sha256:{'3' * 64}",
+                                "effective": {
+                                    "provider": "codex",
+                                    "account_profile": "codex_b",
+                                    "actual_model": "gpt-older",
+                                    "actual_reasoning_effort": "medium",
+                                },
                             },
                         },
                     ],
@@ -147,6 +160,8 @@ def test_public_health_correlates_binding_and_drops_process_internals(tmp_path: 
     assert item.desired.revision == 3
     assert item.desired.provider == "codex"
     assert item.applied[0].revision == 2
+    assert item.applied[0].model == "gpt-old"
+    assert item.applied[0].reasoning_effort == "high"
     assert item.active_instance_count == 1
     assert item.activity == "BUSY"
     assert result.telegram_e2e_verified is False
@@ -156,6 +171,7 @@ def test_public_health_correlates_binding_and_drops_process_internals(tmp_path: 
     assert "cc-private" not in encoded
     assert "cc-retired" not in encoded
     assert "must-not-be-public" not in encoded
+    assert "/must/not/leak" not in encoded
 
 
 def test_runtime_outage_is_visible_without_default_or_false_health(tmp_path: Path) -> None:

@@ -855,11 +855,11 @@
         ? runtimeBinding.desired
         : null;
       const runtimeRunning = Boolean(managedDesired && runtimeBinding.active_instance_count > 0);
+      const currentApplied = runtimeRunning && runtimeBinding.applied?.length
+        ? runtimeBinding.applied[runtimeBinding.applied.length - 1]
+        : null;
       const desiredIsApplied = Boolean(
-        runtimeRunning
-        && runtimeBinding.applied?.some(
-          (revision) => revision.spec_digest === managedDesired.spec_digest,
-        ),
+        currentApplied && currentApplied.spec_digest === managedDesired.spec_digest,
       );
       const runtimeActivity = {
         BUSY: "working",
@@ -875,11 +875,12 @@
         missing_launch_fields: managedDesired ? [] : project.missing_launch_fields,
         tmux_session_running: managedDesired ? runtimeRunning : project.tmux_session_running,
         activity_status: managedDesired ? runtimeActivity || "unknown" : project.activity_status,
-        current_model: desiredIsApplied ? managedDesired.model : project.current_model,
-        current_reasoning_effort: desiredIsApplied
-          ? managedDesired.reasoning_effort
-          : project.current_reasoning_effort,
-        runtime_selection_status: desiredIsApplied ? "current" : project.runtime_selection_status,
+        current_model: currentApplied?.model || project.current_model,
+        current_reasoning_effort: currentApplied?.reasoning_effort
+          || project.current_reasoning_effort,
+        current_account_profile: currentApplied?.account_profile || project.account_slug || null,
+        runtime_selection_status: currentApplied ? "current" : project.runtime_selection_status,
+        desired_is_applied: desiredIsApplied,
         project_id: settings?.project_id || project.project_id || null,
         revision: settings?.revision ?? null,
         provider_id: settings?.provider_id || null,
@@ -920,10 +921,19 @@
     if (project.tmux_session_running) {
       const current = project.runtime_selection_status === "current";
       const currentModel = current
-        ? modelDisplayName(project.current_model, project.account_slug)
+        ? modelDisplayName(project.current_model, project.current_account_profile)
         : "Текущая модель не определена";
       const currentReasoning = current && project.current_reasoning_effort
         ? (effortLabels[project.current_reasoning_effort] || project.current_reasoning_effort)
+        : "—";
+      const pendingChange = project.runtime_binding_health?.health === "PENDING_CHANGE"
+        && !project.desired_is_applied;
+      const pendingModel = modelDisplayName(
+        project.model,
+        project.account_profile || project.account_slug,
+      );
+      const pendingReasoning = project.reasoning_effort
+        ? (effortLabels[project.reasoning_effort] || project.reasoning_effort)
         : "—";
       return `
         <section class="launch-settings" aria-label="Текущие параметры Codex">
@@ -934,6 +944,12 @@
             <div><dt>Модель</dt><dd>${escapeHtml(currentModel)}</dd></div>
             <div><dt>Reasoning</dt><dd>${escapeHtml(currentReasoning)}</dd></div>
           </dl>
+          ${pendingChange ? `
+            <div class="launch-settings-header"><h4>После переключения</h4></div>
+            <dl class="settings-list">
+              <div><dt>Модель</dt><dd>${escapeHtml(pendingModel)}</dd></div>
+              <div><dt>Reasoning</dt><dd>${escapeHtml(pendingReasoning)}</dd></div>
+            </dl>` : ""}
         </section>`;
     }
     const nextModel = modelDisplayName(project.model, project.account_profile || project.account_slug);

@@ -39,6 +39,13 @@ class RuntimeDesiredPublic(RuntimeRevisionPublic):
     reasoning_effort: str = Field(min_length=1, max_length=100)
 
 
+class RuntimeAppliedPublic(RuntimeRevisionPublic):
+    provider: str = Field(min_length=1, max_length=64)
+    account_profile: str = Field(min_length=1, max_length=128)
+    model: str = Field(min_length=1, max_length=200)
+    reasoning_effort: str = Field(min_length=1, max_length=100)
+
+
 class RuntimeBindingHealthPublic(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -54,7 +61,7 @@ class RuntimeBindingHealthPublic(BaseModel):
     runtime_available: bool
     desired: RuntimeDesiredPublic
     runtime_desired: RuntimeRevisionPublic | None = None
-    applied: tuple[RuntimeRevisionPublic, ...] = ()
+    applied: tuple[RuntimeAppliedPublic, ...] = ()
     active_instance_count: int = Field(ge=0)
     activity: RuntimeActivity
     diagnostic_code: str | None = Field(default=None, max_length=100)
