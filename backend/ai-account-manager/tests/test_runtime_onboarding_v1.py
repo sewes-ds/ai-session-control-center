@@ -538,6 +538,7 @@ def test_onboarding_api_reports_success_only_after_runtime_ack_and_retries_safel
     monkeypatch.setenv("TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", "3600")
     get_settings.cache_clear()
     calls: list[tuple[int, str | None]] = []
+    trust_calls: list[tuple[str, tuple[Path, ...]]] = []
     notifications: list[dict[str, object]] = []
     notification_failures_remaining = 1
 
@@ -551,6 +552,15 @@ def test_onboarding_api_reports_success_only_after_runtime_ack_and_retries_safel
     monkeypatch.setattr(
         "ai_account_manager.api.routes.onboarding.validate_provider_project_settings",
         lambda **_kwargs: None,
+    )
+
+    def reconcile_trust(*, provider_id, project_paths, settings):
+        assert settings.runtime_control_path == path
+        trust_calls.append((provider_id, project_paths))
+
+    monkeypatch.setattr(
+        "ai_account_manager.api.routes.onboarding.reconcile_project_trust",
+        reconcile_trust,
     )
 
     class FakeConnector:
@@ -614,6 +624,7 @@ def test_onboarding_api_reports_success_only_after_runtime_ack_and_retries_safel
             json=payload,
         )
         assert failed.status_code == 503
+        assert trust_calls == [("codex", (project.resolve(),))]
         interim = read_runtime_control_store(path)
         binding = next(iter(interim.bindings.values()))
         assert binding.lifecycle_status == "UNCONFIGURED"
@@ -634,6 +645,7 @@ def test_onboarding_api_reports_success_only_after_runtime_ack_and_retries_safel
         assert configured_record.state == "CONFIGURED"
         assert configured_record.completion_message_id is None
         assert len(calls) == 2
+        assert trust_calls == 2 * [("codex", (project.resolve(),))]
         assert len(notifications) == 1
 
         configured_status = client.get(
@@ -681,5 +693,6 @@ def test_onboarding_api_reports_success_only_after_runtime_ack_and_retries_safel
         assert replay.json() == succeeded.json()
         assert len(calls) == 2
         assert len(notifications) == 2
+        assert trust_calls == 2 * [("codex", (project.resolve(),))]
     finally:
         get_settings.cache_clear()

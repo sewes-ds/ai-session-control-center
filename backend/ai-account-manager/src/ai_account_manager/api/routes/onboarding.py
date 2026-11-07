@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Request
 from urllib.parse import quote
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,6 +18,10 @@ from ai_account_manager.core.project_settings import (
     ProjectSettingsError,
     project_id_for_path,
     validate_provider_project_settings,
+)
+from ai_account_manager.core.project_trust import (
+    ProjectTrustError,
+    reconcile_project_trust,
 )
 from ai_account_manager.core.runtime_control import read_runtime_control_store
 from ai_account_manager.core.runtime_onboarding import (
@@ -198,6 +204,15 @@ async def apply_onboarding(
             reasoning_effort=payload.reasoning_effort,
             settings=settings,
         )
+        # Project capabilities belong to the project, not to the currently
+        # selected provider account.  Materialize trust into every registered
+        # provider profile before Runtime can publish or launch the binding.
+        # This keeps account switching interchangeable for the same agent.
+        reconcile_project_trust(
+            provider_id=payload.provider,
+            project_paths=(Path(canonical_cwd),),
+            settings=settings,
+        )
         prepared = prepare_topic_onboarding_binding(
             settings.runtime_control_path,
             onboarding_id=payload.onboarding_id,
@@ -210,7 +225,12 @@ async def apply_onboarding(
             reasoning_effort=payload.reasoning_effort,
             source_ref=f"telegram-user:{principal.user_id}",
         )
-    except (ProjectOnboardingError, ProjectSettingsError, RuntimeOnboardingError) as exc:
+    except (
+        ProjectOnboardingError,
+        ProjectSettingsError,
+        ProjectTrustError,
+        RuntimeOnboardingError,
+    ) as exc:
         raise HTTPException(
             status_code=409,
             detail={"code": exc.code, "message": exc.message},
