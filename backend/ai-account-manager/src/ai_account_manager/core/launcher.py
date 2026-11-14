@@ -63,6 +63,11 @@ def _resolved_command(settings: AppSettings) -> str:
     return _safe_string(command, field_name="command", max_length=4096)
 
 
+def _resolved_claude_command(settings: AppSettings) -> str:
+    command = str(settings.claude_code_binary.expanduser().resolve(strict=False))
+    return _safe_string(command, field_name="command", max_length=4096)
+
+
 def _reasoning_override(reasoning_effort: str) -> str:
     return "model_reasoning_effort=" + json.dumps(reasoning_effort)
 
@@ -109,6 +114,14 @@ def build_codex_resume_argv(
     ]
 
 
+def build_claude_start_argv(*, claude_binary: str, model: str) -> list[str]:
+    return [
+        _safe_string(claude_binary, field_name="claude_binary", max_length=4096),
+        "--model",
+        _safe_string(model, field_name="model", max_length=200),
+    ]
+
+
 def _spec_hash(spec_core: dict[str, object]) -> str:
     encoded = json.dumps(
         spec_core,
@@ -123,9 +136,16 @@ def _profile_path_for_codex(settings: AppSettings, account_profile: str) -> Path
     profile = (settings.codex_profiles_root / account_profile).expanduser().resolve(strict=False)
     root = settings.codex_profiles_root.expanduser().resolve(strict=False)
     if not _is_relative_to(profile, root):
-        raise LauncherResolveError("profile_missing", "Codex profile is outside CODEX_PROFILES_ROOT")
+        raise LauncherResolveError(
+            "profile_missing", "Codex profile is outside CODEX_PROFILES_ROOT"
+        )
     auth_json = profile / "auth.json"
-    if profile.is_symlink() or not profile.is_dir() or auth_json.is_symlink() or not auth_json.is_file():
+    if (
+        profile.is_symlink()
+        or not profile.is_dir()
+        or auth_json.is_symlink()
+        or not auth_json.is_file()
+    ):
         raise LauncherResolveError("profile_missing", "Codex profile auth.json is missing")
     return profile
 
@@ -170,9 +190,13 @@ def build_project_launch_spec(
         revision = raw_record.get("revision")
         if revision != expected_settings_revision:
             raise LauncherResolveError("revision_mismatch", "Project settings revision mismatch")
-        provider_id = _safe_string(str(raw_record.get("provider_id") or ""), field_name="provider_id").lower()
-        if provider_id != "codex":
-            raise LauncherResolveError("provider_settings_not_supported", "Provider launcher is not supported")
+        provider_id = _safe_string(
+            str(raw_record.get("provider_id") or ""), field_name="provider_id"
+        ).lower()
+        if provider_id not in {"codex", "claude_code"}:
+            raise LauncherResolveError(
+                "provider_settings_not_supported", "Provider launcher is not supported"
+            )
         account_profile = _safe_string(
             str(raw_record.get("account_profile") or ""),
             field_name="account_profile",
@@ -204,23 +228,31 @@ def build_project_launch_spec(
     if validation.capability_source != "current" and not allow_last_known_good:
         raise LauncherResolveError(
             "capabilities_current_required",
-            "Current Codex capabilities are required",
+            "Current provider capabilities are required",
         )
-
-    profile_path = _profile_path_for_codex(settings, account_profile)
-    auth_status = get_codex_auth_status(account_profile, settings=settings).status
-    command = _resolved_command(settings)
     cwd = str(cwd_path)
-    env = {"CODEX_HOME": str(profile_path)}
-    argv = build_codex_start_argv(
-        codex_binary=command,
-        model=model,
-        reasoning_effort=reasoning_effort,
-        cwd=cwd,
-    )
     warnings = list(validation.warnings)
-    if auth_status != "ready":
-        warnings.append(f"codex_auth_status:{auth_status}")
+    if provider_id == "codex":
+        profile_path = _profile_path_for_codex(settings, account_profile)
+        auth_status = get_codex_auth_status(account_profile, settings=settings).status
+        command = _resolved_command(settings)
+        env = {"CODEX_HOME": str(profile_path)}
+        argv = build_codex_start_argv(
+            codex_binary=command,
+            model=model,
+            reasoning_effort=reasoning_effort,
+            cwd=cwd,
+        )
+        if auth_status != "ready":
+            warnings.append(f"codex_auth_status:{auth_status}")
+    else:
+        from ai_account_manager.providers.claude_code.deepseek import read_api_key
+
+        read_api_key(settings)
+        auth_status = "ready"
+        command = _resolved_claude_command(settings)
+        env = {}
+        argv = build_claude_start_argv(claude_binary=command, model=model)
 
     core = {
         "spec_version": 1,
@@ -258,7 +290,9 @@ def _resolve_project_path(project_path: str, settings: AppSettings) -> Path:
         )
 
     if not resolved.is_dir():
-        raise LauncherResolveError("project_missing", "Project path does not exist or is not a directory")
+        raise LauncherResolveError(
+            "project_missing", "Project path does not exist or is not a directory"
+        )
     return resolved
 
 
@@ -298,7 +332,33 @@ def resolve_launcher(
             warnings=warnings,
         )
 
-    if provider_id in {"claude_code", "gemini_cli"}:
-        raise LauncherResolveError("provider_not_implemented", f"Provider {provider_id} launcher is not implemented")
+    if provider_id == "claude_code":
+        from ai_account_manager.providers.claude_code.deepseek import (
+            ACCOUNT_SLUG,
+            read_api_key,
+        )
+
+        if account_slug != ACCOUNT_SLUG:
+            raise LauncherResolveError("profile_missing", "Unknown Claude Code profile")
+        read_api_key(settings)
+        key_path = settings.deepseek_api_key_path.expanduser()
+        return LauncherResolveResponse(
+            provider_id=provider_id,
+            account_slug=account_slug,
+            project_path=str(cwd),
+            cwd=str(cwd),
+            command="claude",
+            argv=["claude"],
+            env={},
+            profile_path=str(key_path.parent),
+            profile_path_exists=key_path.parent.is_dir(),
+            auth_status="ready",
+            warnings=[],
+        )
+
+    if provider_id == "gemini_cli":
+        raise LauncherResolveError(
+            "provider_not_implemented", f"Provider {provider_id} launcher is not implemented"
+        )
 
     raise LauncherResolveError("provider_unknown", "Unknown provider")

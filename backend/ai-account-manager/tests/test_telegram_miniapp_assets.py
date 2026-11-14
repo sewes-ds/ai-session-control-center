@@ -163,7 +163,7 @@ def test_new_project_onboarding_is_path_first_and_does_not_start_on_confirmation
     assert "/api/sessions/project-onboarding/apply" in javascript
     assert 'project.onboarding_state === "UNCONFIGURED"' in javascript
     assert "Первую tmux-сессию запустит следующее сообщение" in javascript
-    assert "runtime spec будет подготовлен без запуска Codex" in javascript
+    assert "Runtime подготовит выбранный provider без немедленного запуска" in javascript
 
 
 def test_api_error_preserves_status_code_and_detail_code() -> None:

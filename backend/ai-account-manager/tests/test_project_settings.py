@@ -121,7 +121,11 @@ def _write_cache(
     cache_root.mkdir(parents=True, exist_ok=True)
     os.chmod(cache_root, 0o700)
     (cache_root / f"{account_profile}.json").write_text(
-        json.dumps(_snapshot(account_profile, models, status=status, model_status=model_status).model_dump()),
+        json.dumps(
+            _snapshot(
+                account_profile, models, status=status, model_status=model_status
+            ).model_dump()
+        ),
         encoding="utf-8",
     )
     os.chmod(cache_root / f"{account_profile}.json", 0o600)
@@ -160,7 +164,9 @@ def _env_app(monkeypatch: pytest.MonkeyPatch, settings: AppSettings) -> TestClie
     monkeypatch.setenv("AI_PROFILES_ROOT", str(settings.ai_profiles_root))
     monkeypatch.setenv("RUNTIME_DATA_ROOT", str(settings.runtime_data_root))
     monkeypatch.setenv("CODEX_CAPABILITIES_CACHE_ROOT", str(settings.codex_capabilities_cache_root))
-    monkeypatch.setenv("AI_PROJECT_ROOTS", ":".join(str(path) for path in settings.ai_project_roots))
+    monkeypatch.setenv(
+        "AI_PROJECT_ROOTS", ":".join(str(path) for path in settings.ai_project_roots)
+    )
     monkeypatch.setenv("RUNTIME_LAUNCH_SPECS_PATH", str(settings.runtime_launch_specs_path))
     monkeypatch.setenv("CODEX_BINARY", str(settings.codex_binary))
     get_settings.cache_clear()
@@ -195,7 +201,9 @@ def test_store_modes_symlink_rejection_cas_and_secret_free_payload(tmp_path: Pat
     assert record.revision == 1
     assert settings.project_settings_path.parent.stat().st_mode & 0o777 == 0o700
     assert settings.project_settings_path.stat().st_mode & 0o777 == 0o600
-    assert (settings.project_settings_path.parent / "project_settings_v2.lock").stat().st_mode & 0o777 == 0o600
+    assert (
+        settings.project_settings_path.parent / "project_settings_v2.lock"
+    ).stat().st_mode & 0o777 == 0o600
     payload = json.loads(settings.project_settings_path.read_text(encoding="utf-8"))
     assert payload["store_revision"] == 2
     assert "profile_path" not in json.dumps(payload)
@@ -389,7 +397,7 @@ def test_codex_validation_account_scoped_model_reasoning_and_cache_states(tmp_pa
     assert exc_info.value.code == "reasoning_not_supported"
     with pytest.raises(ProjectSettingsError) as exc_info:
         validate_provider_project_settings(
-            provider_id="claude_code",
+            provider_id="gemini_cli",
             account_profile="codex_a",
             model="account-a-model",
             reasoning_effort="low",
@@ -619,7 +627,9 @@ def test_runtime_comparison_incomplete_account_differs_and_unknown(
     assert unknown.json()["runtime_application_status"] == "runtime_unknown"
 
 
-def _runtime_record(settings: AppSettings, project_id: str, expected_revision: int = 1) -> dict[str, object]:
+def _runtime_record(
+    settings: AppSettings, project_id: str, expected_revision: int = 1
+) -> dict[str, object]:
     spec = build_project_launch_spec(
         project_id=project_id,
         expected_settings_revision=expected_revision,
@@ -735,5 +745,9 @@ def test_runtime_store_invalid_and_absent_get_are_non_mutating(
     assert invalid.status_code == 200
     assert invalid.json()["runtime_application_status"] == "runtime_spec_invalid"
     assert settings.runtime_launch_specs_path.exists()
-    assert hashlib.sha256(settings.runtime_launch_specs_path.read_bytes()).hexdigest() == invalid_sha
-    assert not list(settings.runtime_launch_specs_path.parent.glob("runtime_launch_specs_v1.json.*.invalid"))
+    assert (
+        hashlib.sha256(settings.runtime_launch_specs_path.read_bytes()).hexdigest() == invalid_sha
+    )
+    assert not list(
+        settings.runtime_launch_specs_path.parent.glob("runtime_launch_specs_v1.json.*.invalid")
+    )

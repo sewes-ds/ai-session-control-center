@@ -196,6 +196,33 @@ def test_manual_selection_updates_only_its_topic_with_cas(tmp_path: Path) -> Non
     assert same.desired == changed.desired
 
 
+def test_manual_selection_can_switch_managed_provider(tmp_path: Path) -> None:
+    path = tmp_path / "runtime_control.json"
+    register_agent_instance(path, _agent())
+    binding = _binding()
+    upsert_runtime_binding(path, binding)
+
+    result, changed = commit_binding_selection(
+        path,
+        binding_id=binding.binding_id,
+        expected_generation_id=binding.desired.generation_id,
+        expected_revision=binding.desired.revision,
+        expected_spec_digest=binding.desired.spec_digest,
+        provider="claude_code",
+        account_profile="deepseek_default",
+        model="deepseek-flash",
+        reasoning_effort="max",
+        source_ref="telegram-user:777001",
+    )
+
+    assert result == "UPDATED"
+    assert changed.desired.provider == "claude_code"
+    assert changed.desired.account_profile == "deepseek_default"
+    assert changed.desired.model == "deepseek-flash"
+    assert changed.desired.revision == binding.desired.revision + 1
+    assert changed.desired.spec_digest == canonical_digest(changed.desired.digest_payload())
+
+
 def test_agent_instance_identity_is_immutable_and_release_change_requires_inactive(
     tmp_path: Path,
 ) -> None:

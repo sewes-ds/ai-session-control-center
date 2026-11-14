@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ai_account_manager.api.routes.auth import router as auth_router
 from ai_account_manager.api.routes.codex import router as codex_router
+from ai_account_manager.api.routes.claude_code import router as claude_code_router
 from ai_account_manager.api.routes.cus_bot import router as cus_bot_router
 from ai_account_manager.api.routes.health import router as health_router
 from ai_account_manager.api.routes.launcher import router as launcher_router
@@ -171,6 +172,7 @@ def create_app() -> FastAPI:
     app.include_router(runtime_router, prefix="/api")
     app.include_router(onboarding_router, prefix="/api")
     app.include_router(codex_router)
+    app.include_router(claude_code_router)
     app.include_router(launcher_router)
     app.include_router(sessions_router)
     app.include_router(upgrade_router)

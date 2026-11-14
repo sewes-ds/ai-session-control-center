@@ -482,6 +482,7 @@ def test_configured_binding_selection_is_topic_scoped_and_never_interrupts(
         "expected_generation_id": first.desired.generation_id,
         "expected_revision": first.desired.revision,
         "expected_spec_digest": first.desired.spec_digest,
+        "provider": "codex",
         "account_profile": "backup",
         "model": "gpt-test-2",
         "reasoning_effort": "medium",

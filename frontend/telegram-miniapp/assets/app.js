@@ -38,6 +38,7 @@
     medium: "Средний",
     high: "Высокий",
     xhigh: "Максимальный",
+    max: "Максимальный",
   };
 
   const state = {
@@ -56,7 +57,7 @@
       project: null,
       step: "edit",
       path: "",
-      selections: { account: "", model: "", reasoning: "" },
+      selections: { provider: "codex", account: "", model: "", reasoning: "" },
       unavailable: { account: false, model: false, reasoning: false },
       validation: null,
       busy: false,
@@ -110,7 +111,7 @@
     topicOnboarding: {
       record: null,
       busy: false,
-      selections: { account: "", model: "", reasoning: "" },
+      selections: { provider: "codex", account: "", model: "", reasoning: "" },
     },
   };
 
@@ -153,6 +154,7 @@
     settingsProjectTopic: document.getElementById("settingsProjectTopic"),
     settingsProjectPath: document.getElementById("settingsProjectPath"),
     settingsRuntimeStatus: document.getElementById("settingsRuntimeStatus"),
+    settingsProviderSelect: document.getElementById("settingsProviderSelect"),
     settingsAccountSelect: document.getElementById("settingsAccountSelect"),
     settingsModelSelect: document.getElementById("settingsModelSelect"),
     settingsModelHelp: document.getElementById("settingsModelHelp"),
@@ -189,6 +191,7 @@
     onboardingState: document.getElementById("onboardingState"),
     onboardingProjectPath: document.getElementById("onboardingProjectPath"),
     onboardingProjectPaths: document.getElementById("onboardingProjectPaths"),
+    onboardingProvider: document.getElementById("onboardingProvider"),
     onboardingAccount: document.getElementById("onboardingAccount"),
     onboardingModel: document.getElementById("onboardingModel"),
     onboardingModelHelp: document.getElementById("onboardingModelHelp"),
@@ -812,19 +815,27 @@
       </button>`;
   }
 
-  function authorizedAccounts() {
-    return state.accounts.filter((account) => account.has_auth_json === true && account.status === "readable");
+  function authorizedAccounts(provider = null) {
+    return state.accounts.filter((account) => {
+      const accountProvider = account.provider_id || "codex";
+      const ready = accountProvider === "claude_code"
+        ? account.auth_ready === true
+        : account.has_auth_json === true && account.status === "readable";
+      return ready && (!provider || accountProvider === provider);
+    });
   }
 
-  function accountLabel(accountSlug) {
-    const account = state.accounts.find((item) => item.account_slug === accountSlug);
+  function accountLabel(accountSlug, provider = null) {
+    const account = state.accounts.find((item) => (
+      item.account_slug === accountSlug && (!provider || item.provider_id === provider)
+    ));
     return account?.label || account?.account_slug || accountSlug || "Не выбрано";
   }
 
   function modelDisplayName(modelId, accountSlug) {
     if (!modelId) return "—";
     const snapshots = [
-      currentCapabilities(accountSlug),
+      currentCapabilities("codex", accountSlug),
       ...state.capabilityCache.values(),
     ].filter(Boolean);
     for (const snapshot of snapshots) {
@@ -1015,7 +1026,8 @@
     const managedAccount = project.runtime_binding_health?.lifecycle_status === "CONFIGURED"
       ? project.runtime_binding_health.desired?.account_profile
       : null;
-    const account = managedAccount ? accountLabel(managedAccount)
+    const managedProvider = project.runtime_binding_health?.desired?.provider || null;
+    const account = managedAccount ? accountLabel(managedAccount, managedProvider)
       : project.account_label || project.account_slug || "Не определён";
     const unconfigured = project.onboarding_state === "UNCONFIGURED";
     const agent = unconfigured && project.agent === "unknown"
@@ -1029,8 +1041,8 @@
       : project.tmux_session_name || "Не создана";
     const canConfigure = project.runtime_binding_health?.lifecycle_status === "CONFIGURED"
       || unconfigured
-      || (project.agent === "codex" && Boolean(project.project_path) && authorizedAccounts().length > 0);
-    const configureTitle = canConfigure ? "" : "Нужен проект Codex и хотя бы один читаемый авторизованный аккаунт";
+      || (Boolean(project.project_path) && authorizedAccounts().length > 0);
+    const configureTitle = canConfigure ? "" : "Нужен путь проекта и хотя бы один готовый аккаунт ИИ";
     const canArchive = Boolean(project.archive_available) && !running;
     const archiveTitle = canArchive ? "" : (project.archive_unavailable_reason || "Архивирование требует подтверждённой остановленной идентичности проекта");
     const key = projectKey(project);
@@ -1530,6 +1542,62 @@
       </article>`;
   }
 
+  function deepSeekAccountCard(account, balance) {
+    const ready = account.auth_ready === true;
+    const rows = (balance?.balance_infos || []).map((item) => `
+      <div class="quota-row">
+        <div class="quota-topline">
+          <span class="quota-name">Баланс ${escapeHtml(item.currency)}</span>
+          <span class="quota-value">${escapeHtml(item.total_balance)} ${escapeHtml(item.currency)}</span>
+        </div>
+        <p class="quota-reset">Пополнено: ${escapeHtml(item.topped_up_balance)} · предоставлено: ${escapeHtml(item.granted_balance)}</p>
+      </div>
+    `).join("");
+    const fetched = balance?.fetched_at ? `Обновлено ${formatLocalDateTime(balance.fetched_at)}` : "Баланс ещё не обновлялся";
+    return `
+      <article class="card" data-account-card="${escapeHtml(account.account_slug)}">
+        <div class="card-body">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Claude Code / DeepSeek</p>
+              <h3 class="card-title">${escapeHtml(account.label || account.account_slug)}</h3>
+              <p class="card-subtitle">${escapeHtml(account.account_slug)}</p>
+            </div>
+            ${statusPill(ready ? "API-ключ готов" : "API-ключ недоступен", ready ? "success" : "danger")}
+          </div>
+          <section class="quota-section quota-block">
+            <div class="quota-section-heading"><h4>Реальный API-баланс</h4></div>
+            <p class="quota-freshness-copy">${escapeHtml(fetched)}</p>
+            ${rows || '<p class="quota-reset">Нажмите «Обновить баланс» для запроса к DeepSeek.</p>'}
+          </section>
+        </div>
+        <div class="card-actions">
+          <button class="button button-secondary" type="button" data-refresh-balance="${escapeHtml(account.account_slug)}" ${ready ? "" : "disabled"}>Обновить баланс</button>
+        </div>
+      </article>`;
+  }
+
+  async function refreshDeepSeekBalance(accountSlug, button) {
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = "Обновление…";
+    try {
+      const balance = await apiRequest(
+        `/api/providers/claude_code/accounts/${encodeURIComponent(accountSlug)}/balance/refresh`,
+        { method: "POST" },
+      );
+      const key = `claude_code:${accountSlug}`;
+      state.accountDetails.set(key, { ...(state.accountDetails.get(key) || {}), balance });
+      renderAccountCards();
+      setNotice(elements.accountsStatus, "Баланс DeepSeek обновлён из API.", "success");
+    } catch (error) {
+      setNotice(elements.accountsStatus, `Не удалось обновить баланс DeepSeek: ${error.message}`, "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  }
+
   async function loadProjects({ background = false, refreshRuntimeSelection = false } = {}) {
     if (state.authStatus !== "ready") return false;
     setNotice(elements.projectsStatus, "");
@@ -1560,6 +1628,16 @@
   }
 
   async function loadAccountDetails(account) {
+    if (account.provider_id === "claude_code") {
+      const balanceResult = await Promise.allSettled([
+        apiRequest(`/api/providers/claude_code/accounts/${encodeURIComponent(account.account_slug)}/balance`),
+      ]);
+      return {
+        account,
+        auth: { status: account.auth_ready ? "ready" : account.status },
+        balance: balanceResult[0].status === "fulfilled" ? balanceResult[0].value : null,
+      };
+    }
     const [authResult, quotaResult] = await Promise.allSettled([
       apiRequest(`/api/providers/codex/accounts/${encodeURIComponent(account.account_slug)}/auth-status`),
       apiRequest(`/api/providers/codex/accounts/${encodeURIComponent(account.account_slug)}/quota`),
@@ -1573,9 +1651,13 @@
 
   function storeAccountDetails(details) {
     for (const detail of details) {
-      state.accountDetails.set(detail.account.account_slug, {
+      const key = detail.account.provider_id === "claude_code"
+        ? `claude_code:${detail.account.account_slug}`
+        : detail.account.account_slug;
+      state.accountDetails.set(key, {
         auth: detail.auth,
         quota: detail.quota,
+        balance: detail.balance,
       });
     }
   }
@@ -1584,8 +1666,13 @@
     state.resetCreditActions.clear();
     state.resetCreditActionCounter = 0;
     elements.accountsList.innerHTML = state.accounts.map((account) => {
-      const detail = state.accountDetails.get(account.account_slug) || {};
-      return accountCard(account, detail.auth || null, detail.quota || null);
+      const key = account.provider_id === "claude_code"
+        ? `claude_code:${account.account_slug}`
+        : account.account_slug;
+      const detail = state.accountDetails.get(key) || {};
+      return account.provider_id === "claude_code"
+        ? deepSeekAccountCard(account, detail.balance || null)
+        : accountCard(account, detail.auth || null, detail.quota || null);
     }).join("");
   }
 
@@ -1623,20 +1710,31 @@
     setNotice(elements.accountsStatus, "");
     renderSkeleton(elements.accountsList, 1);
     try {
-      const response = await apiRequest("/api/providers/codex/accounts");
-      state.accounts = response.accounts || [];
+      const [codexResponse, claudeResponse] = await Promise.all([
+        apiRequest("/api/providers/codex/accounts"),
+        apiRequest("/api/providers/claude_code/accounts").catch(() => ({ accounts: [] })),
+      ]);
+      const codexAccounts = (codexResponse.accounts || []).map((account) => ({
+        ...account,
+        provider_id: "codex",
+      }));
+      const claudeAccounts = (claudeResponse.accounts || []).map((account) => ({
+        ...account,
+        provider_id: "claude_code",
+      }));
+      state.accounts = [...codexAccounts, ...claudeAccounts];
       if (initialQuotaRefresh) {
-        for (const account of authorizedAccounts()) {
+        for (const account of authorizedAccounts("codex")) {
           setQuotaFreshness(account.account_slug, "pending");
         }
       }
-      if (!response.accounts?.length) {
+      if (!state.accounts.length) {
         state.accountDetails.clear();
         renderEmpty(elements.accountsList, "Аккаунтов пока нет", "Добавьте первый аккаунт через штатную авторизацию Codex.");
         renderProjects();
         return true;
       }
-      const details = await Promise.all(response.accounts.map(loadAccountDetails));
+      const details = await Promise.all(state.accounts.map(loadAccountDetails));
       if (state.authStatus !== "ready") {
         elements.accountsList.replaceChildren();
         return false;
@@ -1688,7 +1786,7 @@
   }
 
   async function refreshInitialAccountQuotas(generation) {
-    const selected = authorizedAccounts();
+    const selected = authorizedAccounts("codex");
     try {
       await runBoundedWorkers(selected, async (account) => {
         if (state.authStatus !== "ready" || state.authReadyGeneration !== generation) return;
@@ -1708,6 +1806,20 @@
           renderAccountCards();
         }
       }, 2);
+      await runBoundedWorkers(authorizedAccounts("claude_code"), async (account) => {
+        if (state.authStatus !== "ready" || state.authReadyGeneration !== generation) return;
+        try {
+          const balance = await apiRequest(
+            `/api/providers/claude_code/accounts/${encodeURIComponent(account.account_slug)}/balance/refresh`,
+            { method: "POST" },
+          );
+          const key = `claude_code:${account.account_slug}`;
+          state.accountDetails.set(key, { ...(state.accountDetails.get(key) || {}), balance });
+          renderAccountCards();
+        } catch (_error) {
+          // Cached balance remains visible; the manual button can refresh it later.
+        }
+      }, 1);
     } finally {
       if (state.quotaInitialRefreshGeneration === generation) {
         state.quotaInitialRefreshInFlight = false;
@@ -1726,7 +1838,7 @@
       await refreshUpgradeDiscovery();
       const discovered = await loadAccounts();
       if (!discovered) return;
-      const selected = authorizedAccounts();
+      const selected = authorizedAccounts("codex");
       let successCount = 0;
       const failures = [];
       for (const account of selected) {
@@ -1749,6 +1861,20 @@
           failures.push(`${account.label || account.account_slug}: ${boundedRefreshError(error)}`);
         }
       }, 2);
+      await runBoundedWorkers(authorizedAccounts("claude_code"), async (account) => {
+        try {
+          const balance = await apiRequest(
+            `/api/providers/claude_code/accounts/${encodeURIComponent(account.account_slug)}/balance/refresh`,
+            { method: "POST" },
+          );
+          const key = `claude_code:${account.account_slug}`;
+          state.accountDetails.set(key, { ...(state.accountDetails.get(key) || {}), balance });
+          successCount += 1;
+          renderAccountCards();
+        } catch (error) {
+          failures.push(`${account.label || account.account_slug}: ${boundedRefreshError(error)}`);
+        }
+      }, 1);
       const summary = [`Лимиты обновлены: ${successCount}`, `Не удалось обновить: ${failures.length}`];
       if (failures.length) {
         const visibleFailures = failures.slice(0, 10);
@@ -2034,12 +2160,16 @@
     return project.account_profile
       || project.runtime_account_profile
       || project.account_slug
-      || authorizedAccounts()[0]?.account_slug
+      || authorizedAccounts(state.settingsDialog.selections.provider)[0]?.account_slug
       || "";
   }
 
-  function currentCapabilities(accountSlug) {
-    return state.capabilityCache.get(accountSlug) || null;
+  function capabilityKey(provider, accountSlug) {
+    return `${provider}:${accountSlug}`;
+  }
+
+  function currentCapabilities(provider, accountSlug) {
+    return state.capabilityCache.get(capabilityKey(provider, accountSlug)) || null;
   }
 
   function modelsFromCapabilities(snapshot) {
@@ -2063,7 +2193,10 @@
   }
 
   function selectedModelItem(project) {
-    const snapshot = currentCapabilities(state.settingsDialog.selections.account);
+    const snapshot = currentCapabilities(
+      state.settingsDialog.selections.provider,
+      state.settingsDialog.selections.account,
+    );
     return visibleModels(project, snapshot).find((model) => model.model_id === state.settingsDialog.selections.model) || null;
   }
 
@@ -2072,6 +2205,7 @@
     const controls = [
       elements.settingsPathInput,
       elements.bindProjectPathButton,
+      elements.settingsProviderSelect,
       elements.settingsAccountSelect,
       elements.settingsModelSelect,
       elements.settingsReasoningSelect,
@@ -2118,27 +2252,28 @@
     if (typeof backButton.hide === "function") backButton.hide();
   }
 
-  async function loadCapabilities(accountSlug, { force = false } = {}) {
+  async function loadCapabilities(provider, accountSlug, { force = false } = {}) {
     if (!accountSlug) return null;
-    if (!force && state.capabilityCache.has(accountSlug)) {
-      return state.capabilityCache.get(accountSlug);
+    const key = capabilityKey(provider, accountSlug);
+    if (!force && state.capabilityCache.has(key)) {
+      return state.capabilityCache.get(key);
     }
     const path = force
-      ? `/api/providers/codex/accounts/${encodeURIComponent(accountSlug)}/capabilities/refresh`
-      : `/api/providers/codex/accounts/${encodeURIComponent(accountSlug)}/capabilities`;
+      ? `/api/providers/${encodeURIComponent(provider)}/accounts/${encodeURIComponent(accountSlug)}/capabilities/refresh`
+      : `/api/providers/${encodeURIComponent(provider)}/accounts/${encodeURIComponent(accountSlug)}/capabilities`;
     const snapshot = await apiRequest(path, { method: force ? "POST" : "GET" });
-    state.capabilityCache.set(accountSlug, snapshot);
+    state.capabilityCache.set(key, snapshot);
     return snapshot;
   }
 
-  async function ensureCapabilities(accountSlug) {
+  async function ensureCapabilities(provider, accountSlug) {
     setCapabilityLoading(true);
     try {
-      const snapshot = await loadCapabilities(accountSlug);
+      const snapshot = await loadCapabilities(provider, accountSlug);
       setNotice(elements.settingsEditNotice, "");
       return snapshot;
     } catch (error) {
-      const cached = currentCapabilities(accountSlug);
+      const cached = currentCapabilities(provider, accountSlug);
       const message = cached
         ? `Не удалось обновить список моделей. Показан последний сохранённый список. ${error.message}`
         : `Нет доступного списка моделей. Нажмите «Обновить модели». ${error.message}`;
@@ -2154,6 +2289,7 @@
     const controlsDisabled = busy || state.topicOnboarding.record?.state === "CONFIGURED";
     [
       elements.onboardingProjectPath,
+      elements.onboardingProvider,
       elements.onboardingAccount,
       elements.onboardingModel,
       elements.onboardingReasoning,
@@ -2164,7 +2300,10 @@
 
   function topicOnboardingModels() {
     const account = state.topicOnboarding.selections.account;
-    return modelsFromCapabilities(currentCapabilities(account)).filter((model) => model.hidden !== true);
+    return modelsFromCapabilities(currentCapabilities(
+      state.topicOnboarding.selections.provider,
+      account,
+    )).filter((model) => model.hidden !== true);
   }
 
   function renderTopicOnboardingReasoning() {
@@ -2222,7 +2361,7 @@
     setTopicOnboardingBusy(true);
     setNotice(elements.onboardingError, "");
     try {
-      await loadCapabilities(account, { force });
+      await loadCapabilities(state.topicOnboarding.selections.provider, account, { force });
       renderTopicOnboardingModels();
       if (force) setNotice(elements.onboardingNotice, "Список моделей обновлён.", "success");
     } catch (error) {
@@ -2234,7 +2373,7 @@
   }
 
   function renderTopicOnboardingAccounts() {
-    const accounts = authorizedAccounts();
+    const accounts = authorizedAccounts(state.topicOnboarding.selections.provider);
     elements.onboardingAccount.innerHTML = accounts.map((account) => (
       `<option value="${escapeHtml(account.account_slug)}">${escapeHtml(account.label || account.account_slug)}</option>`
     )).join("");
@@ -2243,7 +2382,7 @@
     if (!accounts.length) {
       setNotice(
         elements.onboardingError,
-        "Нет авторизованного аккаунта Codex. Добавьте аккаунт в CUS и откройте настройку снова.",
+        "Нет готового аккаунта выбранного провайдера. Проверьте его во вкладке «Аккаунты».",
         "error",
       );
     }
@@ -2306,9 +2445,10 @@
   async function loadTopicOnboarding() {
     setTopicOnboardingBusy(true);
     setNotice(elements.onboardingError, "");
-    const [recordResult, accountsResult, projectsResult] = await Promise.allSettled([
+    const [recordResult, codexAccountsResult, claudeAccountsResult, projectsResult] = await Promise.allSettled([
       apiRequest(`/api/onboarding/${encodeURIComponent(topicOnboardingToken)}`),
       apiRequest("/api/providers/codex/accounts"),
+      apiRequest("/api/providers/claude_code/accounts"),
       apiRequest("/api/sessions/projects"),
     ]);
     try {
@@ -2327,8 +2467,18 @@
         }
         return;
       }
-      if (accountsResult.status === "rejected") throw accountsResult.reason;
-      state.accounts = accountsResult.value.accounts || [];
+      if (codexAccountsResult.status === "rejected") throw codexAccountsResult.reason;
+      const codexAccounts = (codexAccountsResult.value.accounts || []).map((account) => ({
+        ...account,
+        provider_id: "codex",
+      }));
+      const claudeAccounts = claudeAccountsResult.status === "fulfilled"
+        ? (claudeAccountsResult.value.accounts || []).map((account) => ({
+          ...account,
+          provider_id: "claude_code",
+        }))
+        : [];
+      state.accounts = [...codexAccounts, ...claudeAccounts];
       renderTopicOnboardingAccounts();
       if (projectsResult.status === "fulfilled") {
         renderTopicOnboardingProjectPaths(projectsResult.value.projects || []);
@@ -2356,7 +2506,7 @@
           body: JSON.stringify({
             onboarding_id: record.onboarding_id,
             project_path: elements.onboardingProjectPath.value.trim(),
-            provider: "codex",
+            provider: state.topicOnboarding.selections.provider,
             account_profile: state.topicOnboarding.selections.account,
             model: state.topicOnboarding.selections.model,
             reasoning_effort: state.topicOnboarding.selections.reasoning,
@@ -2384,6 +2534,7 @@
   }
 
   function setCapabilityLoading(isLoading) {
+    elements.settingsProviderSelect.disabled = isLoading || state.settingsDialog.busy;
     elements.settingsAccountSelect.disabled = isLoading || state.settingsDialog.busy;
     elements.settingsModelSelect.disabled = isLoading || state.settingsDialog.busy;
     elements.settingsReasoningSelect.disabled = isLoading || state.settingsDialog.busy;
@@ -2393,13 +2544,14 @@
   }
 
   function renderAccountOptions(project) {
-    const candidates = authorizedAccounts();
+    const provider = state.settingsDialog.selections.provider;
+    const candidates = authorizedAccounts(provider);
     const selected = state.settingsDialog.selections.account;
     const hasSelected = candidates.some((account) => account.account_slug === selected);
     state.settingsDialog.unavailable.account = Boolean(selected && !hasSelected);
     const options = [];
     if (state.settingsDialog.unavailable.account) {
-      options.push(`<option value="${escapeHtml(selected)}">${escapeHtml(accountLabel(selected))} — недоступен</option>`);
+      options.push(`<option value="${escapeHtml(selected)}">${escapeHtml(accountLabel(selected, provider))} — недоступен</option>`);
     }
     options.push(...candidates.map((account) =>
       `<option value="${escapeHtml(account.account_slug)}">${escapeHtml(account.label || account.account_slug)}</option>`
@@ -2408,7 +2560,7 @@
     elements.settingsAccountSelect.value = selected || candidates[0]?.account_slug || "";
     state.settingsDialog.selections.account = elements.settingsAccountSelect.value;
     if (!candidates.length) {
-      setNotice(elements.settingsEditError, "Нет читаемых авторизованных аккаунтов Codex.", "error");
+      setNotice(elements.settingsEditError, "Нет готового аккаунта выбранного провайдера.", "error");
     }
     elements.settingsProjectTopic.textContent = project.topic_name || "Проект";
     elements.settingsProjectPath.textContent = project.project_path || "Путь не указан";
@@ -2419,7 +2571,7 @@
 
   function renderModelOptions(project) {
     const account = state.settingsDialog.selections.account;
-    const snapshot = currentCapabilities(account);
+    const snapshot = currentCapabilities(state.settingsDialog.selections.provider, account);
     const models = visibleModels(project, snapshot);
     let selected = state.settingsDialog.selections.model;
     if (!selected) {
@@ -2502,8 +2654,12 @@
   }
 
   async function renderSettingsForm(project) {
+    elements.settingsProviderSelect.value = state.settingsDialog.selections.provider;
     renderAccountOptions(project);
-    await ensureCapabilities(state.settingsDialog.selections.account);
+    await ensureCapabilities(
+      state.settingsDialog.selections.provider,
+      state.settingsDialog.selections.account,
+    );
     renderModelOptions(project);
     renderReasoningOptions(project);
     updateApplyAvailability();
@@ -2513,7 +2669,7 @@
     const project = projectByKey(projectKeyValue);
     const onboarding = project?.onboarding_state === "UNCONFIGURED";
     const managedBinding = project?.runtime_binding_health?.lifecycle_status === "CONFIGURED";
-    if (!project || (!onboarding && !managedBinding && (project.agent !== "codex" || !project.project_path))) return;
+    if (!project || (!onboarding && !managedBinding && !project.project_path)) return;
     state.settingsDialog.project = project;
     state.settingsDialog.path = project.project_path || "";
     setNotice(elements.settingsPathError, "");
@@ -2533,15 +2689,21 @@
     }
     if (!authorizedAccounts().length) {
       closeProjectSettingsDialog({ force: true });
-      setNotice(elements.projectsStatus, "Нет читаемого авторизованного аккаунта Codex. Сначала добавьте его во вкладке «Аккаунты».");
+      setNotice(elements.projectsStatus, "Нет готового аккаунта ИИ. Проверьте вкладку «Аккаунты».");
       switchTab("accounts");
       return;
     }
     state.settingsDialog.step = "edit";
     state.settingsDialog.validation = null;
     state.settingsDialog.unavailable = { account: false, model: false, reasoning: false };
+    const selectedProvider = managedBinding
+      ? project.runtime_binding_health.desired.provider
+      : project.provider_id || (project.agent === "claude" ? "claude_code" : project.agent) || "codex";
     state.settingsDialog.selections = {
-      account: managedBinding ? project.runtime_binding_health.desired.account_profile : preferredAccount(project),
+      provider: selectedProvider,
+      account: managedBinding
+        ? project.runtime_binding_health.desired.account_profile
+        : authorizedAccounts(selectedProvider)[0]?.account_slug || "",
       model: project.model || project.runtime_model || "",
       reasoning: project.reasoning_effort || project.runtime_reasoning_effort || "",
     };
@@ -2604,7 +2766,7 @@
         return;
       }
       if (!authorizedAccounts().length) {
-        setNotice(elements.projectsStatus, "Путь привязан. Теперь добавьте авторизованный аккаунт Codex.", "success");
+        setNotice(elements.projectsStatus, "Путь привязан. Теперь подготовьте аккаунт ИИ.", "success");
         switchTab("accounts");
         return;
       }
@@ -2620,7 +2782,7 @@
     const project = state.settingsDialog.project;
     return {
       project_path: project.project_path,
-      provider_id: "codex",
+      provider_id: state.settingsDialog.selections.provider,
       account_profile: state.settingsDialog.selections.account,
       model: state.settingsDialog.selections.model,
       reasoning_effort: state.settingsDialog.selections.reasoning,
@@ -2640,7 +2802,10 @@
   }
 
   function selectedAccountHasCurrentCapabilities() {
-    const snapshot = currentCapabilities(state.settingsDialog.selections.account);
+    const snapshot = currentCapabilities(
+      state.settingsDialog.selections.provider,
+      state.settingsDialog.selections.account,
+    );
     return snapshot?.models?.status === "ok" && (snapshot.models.items || []).length > 0 && snapshot.status !== "not_refreshed";
   }
 
@@ -2649,7 +2814,11 @@
     if (validation.capability_source === "current" && selectedAccountHasCurrentCapabilities()) {
       return validation;
     }
-    await loadCapabilities(state.settingsDialog.selections.account, { force: true });
+    await loadCapabilities(
+      state.settingsDialog.selections.provider,
+      state.settingsDialog.selections.account,
+      { force: true },
+    );
     const project = state.settingsDialog.project;
     renderModelOptions(project);
     renderReasoningOptions(project);
@@ -2667,7 +2836,11 @@
     const project = state.settingsDialog.project;
     const rows = [
       ["Проект", project.topic_name || project.project_path],
-      ["Аккаунт", accountLabel(state.settingsDialog.selections.account)],
+      ["ИИ / harness", state.settingsDialog.selections.provider === "claude_code" ? "Claude Code / DeepSeek" : "Codex"],
+      ["Аккаунт", accountLabel(
+        state.settingsDialog.selections.account,
+        state.settingsDialog.selections.provider,
+      )],
       ["Модель", state.settingsDialog.selections.model],
       ["Reasoning", effortLabels[state.settingsDialog.selections.reasoning] || state.settingsDialog.selections.reasoning],
     ];
@@ -2683,14 +2856,14 @@
     const onboarding = project.onboarding_state === "UNCONFIGURED";
     const managedBinding = project.runtime_binding_health?.lifecycle_status === "CONFIGURED";
     elements.settingsConfirmPrimaryCopy.textContent = onboarding
-      ? "После подтверждения runtime spec будет подготовлен без запуска Codex."
+      ? "После подтверждения Runtime подготовит выбранный provider без немедленного запуска."
       : managedBinding
       ? "ЦУС сохранит выбор для этого топика; Runtime применит его после IDLE."
       : "После подтверждения проект будет запущен с выбранными настройками.";
     elements.settingsConfirmSecondaryCopy.textContent = onboarding
       ? "Первую tmux-сессию запустит следующее сообщение в этом Telegram-топике."
       : managedBinding
-      ? "Активная задача не прервётся. Новая Codex-сессия запустится при следующем сообщении."
+      ? "Активная задача не прервётся. Новая сессия выбранного ИИ запустится при следующем сообщении."
       : "Текущая задача и очередь проекта, если они есть, будут прерваны.";
   }
 
@@ -2731,6 +2904,7 @@
               expected_generation_id: binding.desired.generation_id,
               expected_revision: binding.desired.revision,
               expected_spec_digest: binding.desired.spec_digest,
+              provider: state.settingsDialog.selections.provider,
               account_profile: state.settingsDialog.selections.account,
               model: state.settingsDialog.selections.model,
               reasoning_effort: state.settingsDialog.selections.reasoning,
@@ -2814,6 +2988,15 @@
     await renderSettingsForm(state.settingsDialog.project);
   }
 
+  async function handleProviderSelectionChange() {
+    state.settingsDialog.selections.provider = elements.settingsProviderSelect.value;
+    state.settingsDialog.selections.account = "";
+    state.settingsDialog.selections.model = "";
+    state.settingsDialog.selections.reasoning = "";
+    state.settingsDialog.unavailable = { account: false, model: false, reasoning: false };
+    await renderSettingsForm(state.settingsDialog.project);
+  }
+
   function handleModelSelectionChange() {
     state.settingsDialog.selections.model = elements.settingsModelSelect.value;
     state.settingsDialog.selections.reasoning = "";
@@ -2834,12 +3017,12 @@
     setSettingsBusy(true);
     setNotice(elements.settingsEditError, "");
     try {
-      await loadCapabilities(account, { force: true });
+      await loadCapabilities(state.settingsDialog.selections.provider, account, { force: true });
       renderModelOptions(state.settingsDialog.project);
       renderReasoningOptions(state.settingsDialog.project);
       setNotice(elements.settingsEditNotice, "Список моделей обновлён.");
     } catch (error) {
-      const cached = currentCapabilities(account);
+      const cached = currentCapabilities(state.settingsDialog.selections.provider, account);
       setNotice(
         elements.settingsEditNotice,
         cached
@@ -3250,6 +3433,8 @@
   elements.accountsList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-refresh-quota]");
     if (button) refreshQuota(button.dataset.refreshQuota, button);
+    const balanceButton = event.target.closest("[data-refresh-balance]");
+    if (balanceButton) refreshDeepSeekBalance(balanceButton.dataset.refreshBalance, balanceButton);
     const reset = event.target.closest("[data-reset-credit-action]");
     if (reset) openResetCreditDialog(reset);
   });
@@ -3258,6 +3443,7 @@
   elements.confirmArchiveButton.addEventListener("click", confirmArchiveDialog);
   elements.cancelArchiveButton.addEventListener("click", closeArchiveDialog);
   elements.settingsAccountSelect.addEventListener("change", handleAccountSelectionChange);
+  elements.settingsProviderSelect.addEventListener("change", handleProviderSelectionChange);
   elements.settingsModelSelect.addEventListener("change", handleModelSelectionChange);
   elements.settingsReasoningSelect.addEventListener("change", handleReasoningSelectionChange);
   elements.refreshCapabilitiesButton.addEventListener("click", refreshSelectedCapabilities);
@@ -3270,6 +3456,14 @@
     void bootstrapTelegramAuth();
   });
   elements.onboardingProjectPath.addEventListener("input", updateTopicOnboardingAvailability);
+  elements.onboardingProvider.addEventListener("change", () => {
+    state.topicOnboarding.selections.provider = elements.onboardingProvider.value;
+    state.topicOnboarding.selections.account = "";
+    state.topicOnboarding.selections.model = "";
+    state.topicOnboarding.selections.reasoning = "";
+    renderTopicOnboardingAccounts();
+    void loadTopicOnboardingCapabilities();
+  });
   elements.onboardingAccount.addEventListener("change", () => {
     state.topicOnboarding.selections.account = elements.onboardingAccount.value;
     state.topicOnboarding.selections.model = "";

@@ -38,6 +38,14 @@
       </label>
 
       <label class="field">
+        <span>ИИ / harness</span>
+        <select id="onboardingProvider">
+          <option value="codex">Codex</option>
+          <option value="claude_code">Claude Code / DeepSeek</option>
+        </select>
+      </label>
+
+      <label class="field">
         <span>Аккаунт</span>
         <select id="onboardingAccount"></select>
       </label>
@@ -130,7 +138,7 @@
   <div id="accountDialog" class="dialog-backdrop is-hidden" role="dialog" aria-modal="true" aria-labelledby="accountDialogTitle">
     <section class="dialog-card">
       <div id="accountCreateStep">
-        <p class="eyebrow">Codex</p>
+        <p class="eyebrow">Провайдер запуска</p>
         <h2 id="accountDialogTitle">Добавить аккаунт</h2>
         <p class="dialog-copy">ЦУС создаст профиль и запустит штатную авторизацию Codex. Пароль OpenAI не вводится и не хранится.</p>
 
@@ -246,6 +254,14 @@
             <strong id="settingsRuntimeStatus">Настройки следующего запуска</strong>
           </div>
         </div>
+
+        <label class="field">
+          <span>ИИ / harness</span>
+          <select id="settingsProviderSelect">
+            <option value="codex">Codex</option>
+            <option value="claude_code">Claude Code / DeepSeek</option>
+          </select>
+        </label>
 
         <label class="field">
           <span>Аккаунт</span>

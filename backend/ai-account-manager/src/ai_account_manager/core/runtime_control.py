@@ -247,6 +247,7 @@ def commit_binding_selection(
     expected_generation_id: str,
     expected_revision: int,
     expected_spec_digest: str,
+    provider: str | None = None,
     account_profile: str,
     model: str,
     reasoning_effort: str,
@@ -276,12 +277,14 @@ def commit_binding_selection(
             raise RuntimeControlStoreError(
                 "desired_revision_conflict", "Binding settings changed; refresh before saving"
             )
-        if desired.provider != "codex":
+        selected_provider = provider or desired.provider
+        if selected_provider not in {"codex", "claude_code"}:
             raise RuntimeControlStoreError(
-                "provider_settings_not_supported", "Manual selection requires managed Codex"
+                "provider_settings_not_supported", "Manual selection requires a managed provider"
             )
         if (
-            desired.account_profile == account_profile
+            desired.provider == selected_provider
+            and desired.account_profile == account_profile
             and desired.model == model
             and desired.reasoning_effort == reasoning_effort
         ):
@@ -289,6 +292,7 @@ def commit_binding_selection(
         digest_payload = {
             **desired.digest_payload(),
             "revision": desired.revision + 1,
+            "provider": selected_provider,
             "account_profile": account_profile,
             "model": model,
             "reasoning_effort": reasoning_effort,

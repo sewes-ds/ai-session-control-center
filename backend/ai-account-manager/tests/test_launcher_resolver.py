@@ -62,7 +62,9 @@ def _settings_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, 
     monkeypatch.setenv("AI_PROJECT_ROOTS", str(project_root))
     monkeypatch.setenv("AI_PROFILES_ROOT", str(profiles_root))
     monkeypatch.setenv("PROJECT_SETTINGS_PATH", str(runtime_root / "project_settings_v2.json"))
-    monkeypatch.setenv("RUNTIME_LAUNCH_SPECS_PATH", str(runtime_root / "runtime_launch_specs_v1.json"))
+    monkeypatch.setenv(
+        "RUNTIME_LAUNCH_SPECS_PATH", str(runtime_root / "runtime_launch_specs_v1.json")
+    )
     monkeypatch.setenv("CODEX_CAPABILITIES_CACHE_ROOT", str(runtime_root / "codex_capabilities"))
     monkeypatch.setenv("CODEX_BINARY", str(codex_binary))
     _clear_settings()
@@ -130,7 +132,9 @@ def _write_cache(
     os.chmod(path, 0o600)
 
 
-def _complete_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[dict[str, Path], Path, str]:
+def _complete_settings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[dict[str, Path], Path, str]:
     paths = _settings_env(monkeypatch, tmp_path)
     project = paths["project_root"] / "alpha"
     project.mkdir()
@@ -230,7 +234,7 @@ def test_launcher_rejects_unimplemented_provider(tmp_path, monkeypatch) -> None:
     response = client.post(
         "/api/launcher/resolve",
         json={
-            "provider_id": "claude_code",
+            "provider_id": "gemini_cli",
             "account_slug": "claude_a",
             "project_path": str(project),
         },
@@ -325,7 +329,9 @@ def test_resolve_project_settings_returns_stable_immutable_spec(
         "--cd",
         str(project.resolve()),
     ]
-    assert data["env"] == {"CODEX_HOME": str((paths["profiles_root"] / "codex" / "codex_a").resolve())}
+    assert data["env"] == {
+        "CODEX_HOME": str((paths["profiles_root"] / "codex" / "codex_a").resolve())
+    }
     assert data["capability_source"] == "current"
     assert "not-real-access" not in json.dumps(data)
     core = {
@@ -357,7 +363,9 @@ def test_launch_spec_hash_changes_on_selected_inputs(
 ) -> None:
     paths, project, project_id = _complete_settings(monkeypatch, tmp_path)
     settings = get_settings()
-    base = build_project_launch_spec(project_id=project_id, expected_settings_revision=1, settings=settings)
+    base = build_project_launch_spec(
+        project_id=project_id, expected_settings_revision=1, settings=settings
+    )
     changed_project = paths["project_root"] / "beta"
     changed_project.mkdir()
     _write_cache(paths["runtime_root"] / "codex_capabilities", "codex_b")
@@ -479,7 +487,7 @@ def test_resolve_project_settings_rejects_incomplete_provider_model_and_reasonin
     assert bad_reasoning.json()["detail"]["code"] == "reasoning_not_supported"
 
     payload["projects"][project_id]["reasoning_effort"] = "medium"
-    payload["projects"][project_id]["provider_id"] = "claude_code"
+    payload["projects"][project_id]["provider_id"] = "gemini_cli"
     settings_path.write_text(json.dumps(payload), encoding="utf-8")
     bad_provider = client.post(
         "/api/launcher/resolve-project-settings",

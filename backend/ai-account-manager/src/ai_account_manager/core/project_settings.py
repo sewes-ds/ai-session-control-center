@@ -211,7 +211,13 @@ def _load_existing_store(settings: AppSettings) -> dict[str, Any]:
         raise ProjectSettingsError("invalid_settings_path", "Settings path must not be a symlink")
     try:
         return _validate_store(_read_json(path))
-    except (OSError, json.JSONDecodeError, ValueError, ValidationError, ProjectSettingsError) as exc:
+    except (
+        OSError,
+        json.JSONDecodeError,
+        ValueError,
+        ValidationError,
+        ProjectSettingsError,
+    ) as exc:
         with _locked(settings, create_parent=True) as locked_path:
             if locked_path.exists() and not locked_path.is_symlink():
                 try:
@@ -227,22 +233,34 @@ def _load_existing_store(settings: AppSettings) -> dict[str, Any]:
                     raise ProjectSettingsError(
                         "settings_store_invalid", "Project settings store is invalid"
                     ) from exc
-        raise ProjectSettingsError("settings_store_invalid", "Project settings store is invalid") from exc
+        raise ProjectSettingsError(
+            "settings_store_invalid", "Project settings store is invalid"
+        ) from exc
 
 
 def _load_store_locked(path: Path) -> dict[str, Any]:
     try:
         return _validate_store(_read_json(path))
-    except (OSError, json.JSONDecodeError, ValueError, ValidationError, ProjectSettingsError) as exc:
+    except (
+        OSError,
+        json.JSONDecodeError,
+        ValueError,
+        ValidationError,
+        ProjectSettingsError,
+    ) as exc:
         _quarantine_invalid(path)
-        raise ProjectSettingsError("settings_store_invalid", "Project settings store is invalid") from exc
+        raise ProjectSettingsError(
+            "settings_store_invalid", "Project settings store is invalid"
+        ) from exc
 
 
 def _write_store_checked(path: Path, payload: dict[str, Any]) -> None:
     try:
         _write_store_atomic(path, payload)
     except OSError as exc:
-        raise ProjectSettingsError("settings_write_failed", "Project settings write failed") from exc
+        raise ProjectSettingsError(
+            "settings_write_failed", "Project settings write failed"
+        ) from exc
 
 
 def read_project_settings_store(settings: AppSettings | None = None) -> tuple[dict[str, Any], bool]:
@@ -375,7 +393,9 @@ def migrate_project_settings_v2(
                             )
                         record = _record_from_legacy(project_path, raw)
                     except ProjectSettingsError as exc:
-                        skipped.append({"path_hash": _legacy_error_key(project_path), "code": exc.code})
+                        skipped.append(
+                            {"path_hash": _legacy_error_key(project_path), "code": exc.code}
+                        )
                         continue
                     store["projects"][record.project_id] = record.model_dump()
         _write_store_checked(path, _validate_store(store))
@@ -412,6 +432,21 @@ def validate_provider_project_settings(
             reasoning_effort=effort_value,
             settings=settings,
         )
+    if provider == "claude_code":
+        from ai_account_manager.providers.claude_code.deepseek import (
+            DeepSeekProviderError,
+            validate_deepseek_settings,
+        )
+
+        try:
+            return validate_deepseek_settings(
+                account_profile=account,
+                model=model_value,
+                reasoning_effort=effort_value,
+                settings=settings,
+            )
+        except DeepSeekProviderError as exc:
+            raise ProjectSettingsError(exc.code, exc.message) from exc
     raise ProjectSettingsError(
         "provider_settings_not_supported", "Provider settings validation is not supported"
     )
@@ -466,13 +501,17 @@ def upsert_project_settings_with_snapshot(
         existing = store["projects"].get(project_id)
         if existing is None:
             if expected_revision is not None:
-                raise ProjectSettingsError("revision_conflict", "Project settings revision conflict")
+                raise ProjectSettingsError(
+                    "revision_conflict", "Project settings revision conflict"
+                )
             previous = None
             revision = 1
         else:
             current = _validate_record(existing)
             if expected_revision != current.revision:
-                raise ProjectSettingsError("revision_conflict", "Project settings revision conflict")
+                raise ProjectSettingsError(
+                    "revision_conflict", "Project settings revision conflict"
+                )
             previous = current
             revision = current.revision + 1
         # Project trust belongs to the CUS project identity, not to the selected
@@ -528,14 +567,14 @@ def restore_project_settings_record(
         if expected.project_id != normalized_id or expected.project_path != str(canonical):
             raise ProjectSettingsError("settings_apply_rollback_failed", "Project settings changed")
         previous = (
-            None
-            if previous_record is None
-            else _validate_record(previous_record.model_dump())
+            None if previous_record is None else _validate_record(previous_record.model_dump())
         )
         if previous is not None and (
             previous.project_id != normalized_id or previous.project_path != str(canonical)
         ):
-            raise ProjectSettingsError("settings_apply_rollback_failed", "Previous settings invalid")
+            raise ProjectSettingsError(
+                "settings_apply_rollback_failed", "Previous settings invalid"
+            )
 
         with _locked(settings, create_parent=True) as path:
             if not path.exists():
@@ -601,14 +640,20 @@ def runtime_view_for_record(
         )
         return ProjectSettingsRuntimeView(
             runtime_account_profile=runtime_account if isinstance(runtime_account, str) else None,
-            runtime_account_matches=bool(runtime_account == record.account_profile and binding_matches),
+            runtime_account_matches=bool(
+                runtime_account == record.account_profile and binding_matches
+            ),
             runtime_application_status="applied" if runtime_matches else "runtime_spec_stale",
             runtime_model=runtime_model if isinstance(runtime_model, str) else None,
-            runtime_reasoning_effort=runtime_reasoning if isinstance(runtime_reasoning, str) else None,
+            runtime_reasoning_effort=runtime_reasoning
+            if isinstance(runtime_reasoning, str)
+            else None,
             runtime_settings_revision=(
                 runtime_settings_revision if isinstance(runtime_settings_revision, int) else None
             ),
-            runtime_spec_sha256=runtime_spec_sha256 if isinstance(runtime_spec_sha256, str) else None,
+            runtime_spec_sha256=runtime_spec_sha256
+            if isinstance(runtime_spec_sha256, str)
+            else None,
         )
 
     if binding is None:

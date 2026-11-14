@@ -111,6 +111,14 @@ class AppSettings:
     runtime_reconcile_enabled: bool = False
     runtime_reconcile_interval_seconds: float = 15.0
     runtime_reconcile_batch_size: int = 50
+    claude_code_binary: Path = Path("/home/devops/.local/bin/claude")
+    deepseek_api_key_path: Path = Path(
+        "/home/devops/.config/ai-session-control-center/credentials/deepseek/default.token"
+    )
+    deepseek_api_base_url: str = "https://api.deepseek.com"
+    deepseek_balance_cache_path: Path = Path(
+        "/home/devops/.ai_session_control_center/deepseek_balance_v1.json"
+    )
 
     def __post_init__(self) -> None:
         paths = {
@@ -120,6 +128,9 @@ class AppSettings:
             "upgrade_engineering_runner": self.upgrade_engineering_runner,
             "upgrade_activation_runner": self.upgrade_activation_runner,
             "upgrade_runner_config_path": self.upgrade_runner_config_path,
+            "deepseek_api_key_path": self.deepseek_api_key_path,
+            "deepseek_balance_cache_path": self.deepseek_balance_cache_path,
+            "claude_code_binary": self.claude_code_binary,
         }
         for name, path in paths.items():
             if not path.is_absolute() or ".." in path.parts or path == Path("/"):
@@ -378,4 +389,20 @@ def get_settings() -> AppSettings:
         enable_provider_codex=_env_bool("ENABLE_PROVIDER_CODEX", True),
         enable_provider_claude_code=_env_bool("ENABLE_PROVIDER_CLAUDE_CODE", False),
         enable_provider_gemini_cli=_env_bool("ENABLE_PROVIDER_GEMINI_CLI", False),
+        claude_code_binary=Path(
+            _env_str("CLAUDE_CODE_BINARY", "/home/devops/.local/bin/claude")
+        ).expanduser(),
+        deepseek_api_key_path=Path(
+            _env_str(
+                "DEEPSEEK_API_KEY_PATH",
+                "/home/devops/.config/ai-session-control-center/credentials/deepseek/default.token",
+            )
+        ).expanduser(),
+        deepseek_api_base_url=_env_str("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com"),
+        deepseek_balance_cache_path=Path(
+            _env_str(
+                "DEEPSEEK_BALANCE_CACHE_PATH",
+                str(runtime_root / "deepseek_balance_v1.json"),
+            )
+        ).expanduser(),
     )

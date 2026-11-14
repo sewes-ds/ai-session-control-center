@@ -14,12 +14,15 @@ _PROVIDER_REGISTRY = [
     ),
     ProviderDescriptor(
         provider_id="claude_code",
-        display_name="Claude Code",
-        status="planned",
+        display_name="Claude Code / DeepSeek",
+        status="implemented",
         quota_supported=False,
         launch_supported=True,
-        implementation_stage="placeholder",
-        notes="Launcher/profile slot exists. Quota support must not be claimed before audit.",
+        implementation_stage="deepseek_v1",
+        notes=(
+            "Claude Code harness with a server-side DeepSeek API profile. "
+            "Official account balance is supported; rate-limit quota is not claimed."
+        ),
     ),
     ProviderDescriptor(
         provider_id="gemini_cli",

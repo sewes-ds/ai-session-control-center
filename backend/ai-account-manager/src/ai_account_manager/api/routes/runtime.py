@@ -35,6 +35,7 @@ class BindingSelectionRequest(BaseModel):
     expected_generation_id: str = Field(min_length=1, max_length=128)
     expected_revision: int = Field(ge=1)
     expected_spec_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    provider: str = Field(min_length=1, max_length=64)
     account_profile: str = Field(min_length=1, max_length=128)
     model: str = Field(min_length=1, max_length=200)
     reasoning_effort: str = Field(min_length=1, max_length=100)
@@ -84,7 +85,7 @@ async def select_binding_profile(
         ) from exc
     try:
         validation = validate_provider_project_settings(
-            provider_id=binding.desired.provider,
+            provider_id=payload.provider,
             account_profile=payload.account_profile,
             model=payload.model,
             reasoning_effort=payload.reasoning_effort,
@@ -93,7 +94,10 @@ async def select_binding_profile(
         if validation.status != "valid" or validation.capability_source != "current":
             raise HTTPException(
                 status_code=409,
-                detail={"code": "capabilities_current_required", "message": "Refresh account models before saving"},
+                detail={
+                    "code": "capabilities_current_required",
+                    "message": "Refresh account models before saving",
+                },
             )
         result, committed = commit_binding_selection(
             settings.runtime_control_path,
@@ -101,6 +105,7 @@ async def select_binding_profile(
             expected_generation_id=payload.expected_generation_id,
             expected_revision=payload.expected_revision,
             expected_spec_digest=payload.expected_spec_digest,
+            provider=payload.provider,
             account_profile=payload.account_profile,
             model=payload.model,
             reasoning_effort=payload.reasoning_effort,

@@ -32,6 +32,12 @@ def _adapter(provider_id: str) -> ProjectTrustAdapter:
         )
 
         return reconcile_codex_project_trust
+    if provider_id == "claude_code":
+        from ai_account_manager.providers.claude_code.deepseek import (
+            reconcile_deepseek_project_trust,
+        )
+
+        return reconcile_deepseek_project_trust
     raise ProjectTrustError(
         "project_trust_not_supported",
         f"Project trust is not implemented for provider {provider_id}",
