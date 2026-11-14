@@ -234,7 +234,7 @@ def test_archive_responsive_styles_and_cache_version() -> None:
     css = (MINIAPP / "assets" / "app.css").read_text(encoding="utf-8")
 
     assert "./assets/app.css?v=cus-runtime-onboarding-v1" in html
-    assert "./assets/app.js?v=cus-runtime-model-switch-v1" in html
+    assert "./assets/app.js?v=cus-claude-deepseek-v1" in html
     assert "https://telegram.org/js/telegram-web-app.js?63" in html
     assert ".archive-disclosure" in css
     assert ".archive-disclosure-header" in css

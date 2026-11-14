@@ -230,7 +230,7 @@ def test_cache_busting_query_is_deterministic() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
 
     assert "./assets/app.css?v=cus-runtime-onboarding-v1" in html
-    assert "./assets/app.js?v=cus-runtime-model-switch-v1" in html
+    assert "./assets/app.js?v=cus-claude-deepseek-v1" in html
     assert "?v=" in html
     assert "Date.now()" not in html
 

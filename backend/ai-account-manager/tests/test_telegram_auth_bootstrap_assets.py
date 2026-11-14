@@ -26,7 +26,7 @@ def test_official_sdk_precedes_versioned_application_assets() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
 
     sdk = 'https://telegram.org/js/telegram-web-app.js?63'
-    application = "./assets/app.js?v=cus-runtime-model-switch-v1"
+    application = "./assets/app.js?v=cus-claude-deepseek-v1"
     assert sdk in html
     assert html.index(sdk) < html.index(application)
     assert "./assets/app.css?v=cus-runtime-onboarding-v1" in html
