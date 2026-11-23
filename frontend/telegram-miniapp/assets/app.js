@@ -5,7 +5,6 @@
   const API_BASE = (window.CUS_API_BASE || inferredApiBase).replace(/\/$/, "");
   const AUTH_WAIT_TIMEOUT_MS = 3000;
   const AUTH_POLL_INTERVAL_MS = 50;
-  const UPGRADE_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
   const previewTokenKey = "cus_preview_token";
   const previewUrl = new URL(window.location.href);
   const previewTokenFromUrl = previewUrl.searchParams.get("preview_token") || "";
@@ -102,12 +101,6 @@
     telegramEventSource: null,
     cleanupComplete: false,
     runtimeManaged: false,
-    upgradeAction: "NONE",
-    upgradeStatus: null,
-    upgradeBusy: false,
-    upgradeRefreshInFlight: false,
-    upgradeRefreshTimer: null,
-    upgradeMaintenance: null,
     topicOnboarding: {
       record: null,
       busy: false,
@@ -117,9 +110,6 @@
 
   const elements = {
     refreshButton: document.getElementById("refreshButton"),
-    upgradeStatusText: document.getElementById("upgradeStatusText"),
-    upgradeMaintenanceText: document.getElementById("upgradeMaintenanceText"),
-    upgradeActionButton: document.getElementById("upgradeActionButton"),
     tabs: Array.from(document.querySelectorAll(".tab")),
     panels: {
       projects: document.getElementById("projectsPanel"),
@@ -374,158 +364,6 @@
 
   function isAuthUnavailableError(error) {
     return error instanceof AuthUnavailableError;
-  }
-
-  const upgradeActionLabels = {
-    CHECK: "Проверить",
-    PREPARE: "Подготовить",
-    REPAIR: "Совместить",
-    UPDATE: "Обновить",
-  };
-
-  function upgradeStatusCopy(status) {
-    const candidate = status?.candidate_version;
-    const current = status?.current_version;
-    const stateName = status?.state || "CURRENT";
-    if (!current && state.runtimeManaged && stateName === "CURRENT") {
-      return "Codex управляется Runtime V1";
-    }
-    if (status?.discovery_error_code && current) {
-      return `Codex ${current} · Не удалось проверить обновления`;
-    }
-    if (stateName === "CURRENT" || stateName === "ACTIVE") {
-      return current ? `Codex ${current}` : "Версия Codex не определена";
-    }
-    if (stateName === "UPDATE_AVAILABLE") {
-      return candidate
-        ? `Доступна новая версия Codex ${candidate}\nСовместимость с ЦУС ещё не проверена`
-        : "Доступна новая версия Codex";
-    }
-    if (stateName === "COMPATIBLE") return `Codex ${candidate || ""} — совместима`.trim();
-    if (stateName === "INCOMPATIBLE") return `Codex ${candidate || ""} — требуется совместить`.trim();
-    if (stateName === "EVIDENCE_READY") return "Данные для совмещения готовы";
-    if (stateName === "HUMAN_REQUIRED") return "Пять попыток исчерпаны — требуется человек";
-    if (stateName === "CHECK_FAILED") return "Проверка выполнена с ошибками — повторять без исправления не нужно";
-    if (stateName === "ROLLBACK") return "Обновление отменено — восстановлена предыдущая версия";
-    if (stateName === "BLOCKED") return "Обновление заблокировано — требуется человек";
-    if (stateName === "CHECKING") return "Проверяем совместимость…";
-    if (stateName === "REPAIRING") return "Выполняется совмещение…";
-    if (stateName === "UPDATING" || stateName === "ROLLING_BACK") return "Выполняется обновление…";
-    return "Версия Codex не определена";
-  }
-
-  function renderUpgradeStatus(status = null) {
-    state.upgradeStatus = status;
-    state.upgradeAction = status?.action || "NONE";
-    state.upgradeBusy = Boolean(status?.busy);
-    elements.upgradeStatusText.textContent = upgradeStatusCopy(status);
-    const label = upgradeActionLabels[state.upgradeAction];
-    elements.upgradeActionButton.classList.toggle("is-hidden", !label);
-    elements.upgradeActionButton.textContent = label || "";
-    elements.upgradeActionButton.disabled = state.upgradeBusy || !label;
-  }
-
-  function compactBytes(value) {
-    const bytes = Number(value);
-    if (!Number.isFinite(bytes) || bytes < 0) return "";
-    if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} ГБ`;
-    if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} МБ`;
-    return `${Math.round(bytes / 1024)} КБ`;
-  }
-
-  function renderUpgradeMaintenance(status = null) {
-    state.upgradeMaintenance = status;
-    const element = elements.upgradeMaintenanceText;
-    element.classList.remove("maintenance-warning", "maintenance-error");
-    if (!status) {
-      element.textContent = "";
-      element.classList.add("is-hidden");
-      return;
-    }
-    const pending = compactBytes(status.pending_cleanup_bytes);
-    const reclaimed = compactBytes(status.reclaimed_bytes);
-    if (status.last_cleanup_status === "FAILED") {
-      element.textContent = pending ? `Очистка не завершена · ожидают ${pending}` : "Очистка не завершена";
-      element.classList.add("maintenance-error");
-    } else if (status.last_cleanup_status === "PENDING") {
-      element.textContent = pending ? `Очистка ожидает безопасного повтора · ${pending}` : "Очистка ожидает безопасного повтора";
-      element.classList.add("maintenance-warning");
-    } else if (status.last_cleanup_at && status.cleaned_count > 0) {
-      element.textContent = reclaimed ? `Хранилище очищено · освобождено ${reclaimed}` : "Хранилище очищено";
-    } else {
-      element.textContent = `Хранилище обновлений · ${compactBytes(status.disposable_usage_bytes)}`;
-    }
-    element.classList.remove("is-hidden");
-  }
-
-  async function loadUpgradeMaintenance() {
-    try {
-      renderUpgradeMaintenance(await apiRequest("/api/providers/codex/upgrade/maintenance"));
-    } catch {
-      renderUpgradeMaintenance();
-    }
-  }
-
-  async function loadUpgradeStatus() {
-    try {
-      const [status, maintenance] = await Promise.all([
-        apiRequest("/api/providers/codex/upgrade/status"),
-        apiRequest("/api/providers/codex/upgrade/maintenance").catch(() => null),
-      ]);
-      renderUpgradeStatus(status);
-      renderUpgradeMaintenance(maintenance);
-    } catch {
-      renderUpgradeStatus();
-      renderUpgradeMaintenance();
-    }
-  }
-
-  async function refreshUpgradeDiscovery() {
-    if (state.authStatus !== "ready" || state.upgradeRefreshInFlight) return;
-    state.upgradeRefreshInFlight = true;
-    try {
-      renderUpgradeStatus(await apiRequest("/api/providers/codex/upgrade/refresh", { method: "POST" }));
-      await loadUpgradeMaintenance();
-    } catch {
-      await loadUpgradeStatus();
-    } finally {
-      state.upgradeRefreshInFlight = false;
-    }
-  }
-
-  function scheduleUpgradeRefresh() {
-    clearInterval(state.upgradeRefreshTimer);
-    state.upgradeRefreshTimer = setInterval(() => {
-      if (state.authStatus === "ready" && document.visibilityState === "visible") {
-        void refreshUpgradeDiscovery();
-      }
-    }, UPGRADE_REFRESH_INTERVAL_MS);
-  }
-
-  async function runUpgradeAction() {
-    if (state.upgradeBusy) return;
-    const paths = {
-      CHECK: "/api/providers/codex/upgrade/check",
-      PREPARE: "/api/providers/codex/upgrade/repair/prepare",
-      REPAIR: "/api/providers/codex/upgrade/repair",
-      UPDATE: "/api/providers/codex/upgrade/update",
-    };
-    const path = paths[state.upgradeAction];
-    if (!path) return;
-    state.upgradeBusy = true;
-    elements.upgradeActionButton.disabled = true;
-    try {
-      const options = { method: "POST" };
-      if (state.upgradeAction === "CHECK" || state.upgradeAction === "UPDATE") {
-        options.headers = { "X-CUS-Operation-Id": crypto.randomUUID() };
-      }
-      renderUpgradeStatus(await apiRequest(path, options));
-      await loadUpgradeMaintenance();
-    } catch {
-      await loadUpgradeStatus();
-    } finally {
-      state.upgradeBusy = false;
-    }
   }
 
   function stopProjectPolling() {
@@ -1258,7 +1096,6 @@
       state.runtimeManaged = (runtimeHealthResponse.bindings || []).some(
         (binding) => binding.lifecycle_status === "CONFIGURED",
       );
-      renderUpgradeStatus(state.upgradeStatus);
     }
     state.integration = projectsResponse.integration || null;
     state.projectsLoaded = true;
@@ -1835,7 +1672,6 @@
     const scrollX = window.scrollX;
     const scrollY = window.scrollY;
     try {
-      await refreshUpgradeDiscovery();
       const discovered = await loadAccounts();
       if (!discovered) return;
       const selected = authorizedAccounts("codex");
@@ -1930,7 +1766,7 @@
     updateRefreshButtonContext();
     try {
       const [projectsResponse, settingsResponse] = await Promise.all([
-        refreshUpgradeDiscovery().then(() => runtimeSelectionRefresh()),
+        runtimeSelectionRefresh(),
         apiRequest("/api/sessions/project-settings"),
       ]);
       if (shouldDeferProjectUpdate()) {
@@ -3293,8 +3129,6 @@
       await loadTopicOnboarding();
       return;
     }
-    void refreshUpgradeDiscovery();
-    scheduleUpgradeRefresh();
     const initialQuotaRefresh = state.quotaAutoRefreshGeneration !== generation;
     const initialRuntimeSelectionRefresh = state.runtimeSelectionAutoRefreshGeneration !== generation;
     if (initialQuotaRefresh) {
@@ -3398,12 +3232,9 @@
       }
     }
     state.telegramEventSource = null;
-    clearInterval(state.upgradeRefreshTimer);
-    state.upgradeRefreshTimer = null;
   }
 
   elements.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
-  elements.upgradeActionButton.addEventListener("click", runUpgradeAction);
   elements.refreshButton.addEventListener("click", refreshCurrentTab);
   elements.addAccountButton.addEventListener("click", openAccountDialog);
   elements.startEnrollmentButton.addEventListener("click", startEnrollment);

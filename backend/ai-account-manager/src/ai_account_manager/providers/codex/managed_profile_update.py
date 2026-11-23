@@ -9,8 +9,8 @@ import sys
 import tomllib
 from pathlib import Path
 
-from ai_account_manager.providers.codex.upgrade_operational import (
-    OperationalError,
+from ai_account_manager.providers.codex.file_safety import (
+    ProfileFileError,
     assert_private_directory,
     atomic_write_bytes,
     atomic_write_model,
@@ -26,7 +26,7 @@ _TABLE = re.compile(r"^\s*\[")
 
 def _read_config(path: Path) -> bytes:
     if path.is_symlink():
-        raise OperationalError("MANAGED_PROFILE_CONFIG_UNSAFE")
+        raise ProfileFileError("MANAGED_PROFILE_CONFIG_UNSAFE")
     try:
         metadata = path.lstat()
     except FileNotFoundError:
@@ -37,7 +37,7 @@ def _read_config(path: Path) -> bytes:
         or stat.S_IMODE(metadata.st_mode) & 0o177
         or metadata.st_size > MAX_CONFIG_BYTES
     ):
-        raise OperationalError("MANAGED_PROFILE_CONFIG_UNSAFE")
+        raise ProfileFileError("MANAGED_PROFILE_CONFIG_UNSAFE")
     return path.read_bytes()
 
 
@@ -45,7 +45,7 @@ def _reconciled_config(raw: bytes) -> bytes:
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise OperationalError("MANAGED_PROFILE_CONFIG_INVALID") from exc
+        raise ProfileFileError("MANAGED_PROFILE_CONFIG_INVALID") from exc
     lines = text.splitlines(keepends=True)
     assignment_indexes: list[int] = []
     first_table = len(lines)
@@ -60,7 +60,7 @@ def _reconciled_config(raw: bytes) -> bytes:
     if len(assignment_indexes) > 1 or (
         assignment_indexes and assignment_indexes[0] >= first_table
     ):
-        raise OperationalError("MANAGED_PROFILE_CONFIG_AMBIGUOUS")
+        raise ProfileFileError("MANAGED_PROFILE_CONFIG_AMBIGUOUS")
     desired = f"{UPDATE_KEY} = false\n"
     if assignment_indexes:
         lines[assignment_indexes[0]] = desired
@@ -77,15 +77,15 @@ def reconcile_disposable_project_trust(profile: Path, project: Path) -> None:
     try:
         parsed = tomllib.loads(raw.decode("utf-8")) if raw else {}
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-        raise OperationalError("CANARY_PROJECT_TRUST_CONFIG_INVALID") from exc
+        raise ProfileFileError("CANARY_PROJECT_TRUST_CONFIG_INVALID") from exc
     projects = parsed.get("projects", {})
     if not isinstance(projects, dict):
-        raise OperationalError("CANARY_PROJECT_TRUST_CONFIG_INVALID")
+        raise ProfileFileError("CANARY_PROJECT_TRUST_CONFIG_INVALID")
     existing = projects.get(str(cwd))
     if existing is not None:
         if isinstance(existing, dict) and existing.get("trust_level") == "trusted":
             return
-        raise OperationalError("CANARY_PROJECT_TRUST_CONFLICT")
+        raise ProfileFileError("CANARY_PROJECT_TRUST_CONFLICT")
     prefix = raw
     if prefix and not prefix.endswith(b"\n"):
         prefix += b"\n"
@@ -136,7 +136,7 @@ def main() -> int:
         return 2
     try:
         reconcile_managed_profiles(Path(sys.argv[1]), Path(sys.argv[2]))
-    except OperationalError:
+    except ProfileFileError:
         return 2
     return 0
 

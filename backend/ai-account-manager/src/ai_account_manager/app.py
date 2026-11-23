@@ -19,7 +19,6 @@ from ai_account_manager.api.routes.onboarding import router as onboarding_router
 from ai_account_manager.api.routes.providers import router as providers_router
 from ai_account_manager.api.routes.runtime import router as runtime_router
 from ai_account_manager.api.routes.sessions import router as sessions_router
-from ai_account_manager.api.routes.upgrade import router as upgrade_router
 from ai_account_manager.core.config import get_settings
 from ai_account_manager.integrations.runtime_reconcile_service import runtime_reconcile_loop
 from ai_account_manager.auth.telegram import (
@@ -175,7 +174,6 @@ def create_app() -> FastAPI:
     app.include_router(claude_code_router)
     app.include_router(launcher_router)
     app.include_router(sessions_router)
-    app.include_router(upgrade_router)
     app.include_router(cus_bot_router)
     _register_miniapp(app, settings.miniapp_static_root)
     return app

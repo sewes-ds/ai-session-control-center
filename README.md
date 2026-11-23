@@ -7,10 +7,9 @@ AI Session Control Center (CUS) is a provider-agnostic control plane for AI CLI
 agents. It manages projects, provider accounts, desired model settings, Telegram
 topic onboarding, and synchronization with a separate local runtime.
 
-This public repository starts with the Runtime V1 architecture. The previous
-combined Telegram overlay and its Git history are intentionally not published.
-A small set of compatibility API modules remains because the current Mini App
-still uses those endpoints while migration to binding-scoped APIs is completed.
+This repository contains only the Runtime V1 control-plane architecture. Provider
+release installation and process lifecycle belong to AI Agent Runtime; CUS only
+manages desired settings, accounts, projects, and operator-facing clients.
 
 ## Architecture
 

@@ -8,7 +8,7 @@ import pytest
 from ai_account_manager.providers.codex.managed_profile_update import (
     reconcile_managed_profiles,
 )
-from ai_account_manager.providers.codex.upgrade_operational import OperationalError
+from ai_account_manager.providers.codex.file_safety import ProfileFileError
 
 
 def test_managed_profile_update_setting_is_idempotent_without_auth_access(tmp_path: Path) -> None:
@@ -44,5 +44,5 @@ def test_managed_profile_rejects_setting_hidden_inside_toml_table(tmp_path: Path
     config.write_text("[features]\ncheck_for_update_on_startup = true\n")
     config.chmod(0o600)
 
-    with pytest.raises(OperationalError, match="MANAGED_PROFILE_CONFIG_AMBIGUOUS"):
+    with pytest.raises(ProfileFileError, match="MANAGED_PROFILE_CONFIG_AMBIGUOUS"):
         reconcile_managed_profiles(profiles, tmp_path / "evidence.json")

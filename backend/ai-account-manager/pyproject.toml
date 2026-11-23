@@ -17,16 +17,8 @@ Repository = "https://github.com/sewes-ds/ai-session-control-center.git"
 Issues = "https://github.com/sewes-ds/ai-session-control-center/issues"
 
 [project.scripts]
-cus-codex-compatibility-gate = "ai_account_manager.providers.codex.compatibility_gate_runner:main"
-cus-codex-engineering-session = "ai_account_manager.providers.codex.engineering_session_runner:main"
-cus-codex-activation = "ai_account_manager.providers.codex.activation_runner:main"
-cus-codex-engineering-worker = "ai_account_manager.providers.codex.upgrade_engineering_worker:main"
-cus-codex-real-canary-worker = "ai_account_manager.providers.codex.upgrade_real_canary_worker:main"
-cus-codex-fixture-tui = "ai_account_manager.providers.codex.upgrade_fixture_codex_tui:main"
 cus-codex-managed-profile-update = "ai_account_manager.providers.codex.managed_profile_update:main"
 cus-codex-reasoning-contract-reconcile = "ai_account_manager.providers.codex.reasoning_contract:main"
-cus-upgrade-retention-sweep = "ai_account_manager.providers.codex.upgrade_retention_sweep:main"
-cus-upgrade-retention-qualify = "ai_account_manager.providers.codex.upgrade_retention_qualification:main"
 cus-runtime-migration-import = "ai_account_manager.runtime_migration_importer:main"
 cus-runtime-agent-instance = "ai_account_manager.runtime_agent_instance:main"
 

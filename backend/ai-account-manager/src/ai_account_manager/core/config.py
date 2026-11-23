@@ -96,14 +96,6 @@ class AppSettings:
     project_activity_path: Path = Path(
         _DEFAULT_RUNTIME_ROOT / "project_activity_v1.json"
     )
-    upgrade_runtime_root: Path = Path(_DEFAULT_RUNTIME_ROOT / "codex-upgrade-mvp")
-    upgrade_gate_runner: Path = Path("/usr/local/libexec/cus-codex-compatibility-gate")
-    upgrade_engineering_runner: Path = Path("/usr/local/libexec/cus-codex-engineering-session")
-    upgrade_activation_runner: Path = Path("/usr/local/libexec/cus-codex-activation")
-    upgrade_runner_config_path: Path = Path("/etc/cus/codex-upgrade.json")
-    upgrade_runner_timeout_seconds: float = 300.0
-    upgrade_max_repair_cycles: int = 5
-    upgrade_release_refresh_ttl_seconds: int = 900
     runtime_control_path: Path = Path(
         _DEFAULT_RUNTIME_ROOT / "runtime_control_v1.json"
     )
@@ -123,11 +115,6 @@ class AppSettings:
     def __post_init__(self) -> None:
         paths = {
             "runtime_control_path": self.runtime_control_path,
-            "upgrade_runtime_root": self.upgrade_runtime_root,
-            "upgrade_gate_runner": self.upgrade_gate_runner,
-            "upgrade_engineering_runner": self.upgrade_engineering_runner,
-            "upgrade_activation_runner": self.upgrade_activation_runner,
-            "upgrade_runner_config_path": self.upgrade_runner_config_path,
             "deepseek_api_key_path": self.deepseek_api_key_path,
             "deepseek_balance_cache_path": self.deepseek_balance_cache_path,
             "claude_code_binary": self.claude_code_binary,
@@ -135,8 +122,6 @@ class AppSettings:
         for name, path in paths.items():
             if not path.is_absolute() or ".." in path.parts or path == Path("/"):
                 raise ValueError(f"{name} must be an absolute non-root path without traversal")
-        if self.upgrade_max_repair_cycles != 5:
-            raise ValueError("UPGRADE_MAX_REPAIR_CYCLES must be exactly 5")
         if self.codex_openviking_seed_account and (
             not self.codex_openviking_seed_account[0].isalnum()
             or len(self.codex_openviking_seed_account) > 81
@@ -146,8 +131,6 @@ class AppSettings:
             )
         ):
             raise ValueError("CODEX_OPENVIKING_SEED_ACCOUNT is invalid")
-        if not 60 <= self.upgrade_release_refresh_ttl_seconds <= 86400:
-            raise ValueError("UPGRADE_RELEASE_REFRESH_TTL_SECONDS must be between 60 and 86400")
         if (
             self.cus_onboarding_token_ttl_seconds < 60
             or self.cus_onboarding_token_ttl_seconds > 86400
@@ -326,34 +309,6 @@ def get_settings() -> AppSettings:
             "10.0",
             greater_than=0.0,
             maximum=120.0,
-        ),
-        upgrade_runtime_root=Path(
-            _env_str("UPGRADE_RUNTIME_ROOT", str(runtime_root / "codex-upgrade-mvp"))
-        ).expanduser(),
-        upgrade_gate_runner=Path(
-            _env_str("UPGRADE_GATE_RUNNER", "/usr/local/libexec/cus-codex-compatibility-gate")
-        ).expanduser(),
-        upgrade_engineering_runner=Path(
-            _env_str(
-                "UPGRADE_ENGINEERING_RUNNER",
-                "/usr/local/libexec/cus-codex-engineering-session",
-            )
-        ).expanduser(),
-        upgrade_activation_runner=Path(
-            _env_str("UPGRADE_ACTIVATION_RUNNER", "/usr/local/libexec/cus-codex-activation")
-        ).expanduser(),
-        upgrade_runner_config_path=Path(
-            _env_str("UPGRADE_RUNNER_CONFIG_PATH", "/etc/cus/codex-upgrade.json")
-        ).expanduser(),
-        upgrade_runner_timeout_seconds=_env_float_range(
-            "UPGRADE_RUNNER_TIMEOUT_SECONDS",
-            "300.0",
-            greater_than=0.0,
-            maximum=900.0,
-        ),
-        upgrade_max_repair_cycles=int(_env_str("UPGRADE_MAX_REPAIR_CYCLES", "5")),
-        upgrade_release_refresh_ttl_seconds=int(
-            _env_str("UPGRADE_RELEASE_REFRESH_TTL_SECONDS", "900")
         ),
         miniapp_static_root=Path(
             _env_str("MINIAPP_STATIC_ROOT", str(default_miniapp_root))
