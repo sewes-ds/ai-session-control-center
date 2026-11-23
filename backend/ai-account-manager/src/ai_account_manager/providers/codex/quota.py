@@ -115,7 +115,10 @@ def _bounded_text(value: Any, *, max_length: int = 200) -> str | None:
 
 def _window_sort_key(window: CodexQuotaWindow) -> tuple[int, int]:
     order = {"primary": 0, "secondary": 1}
-    return (order.get(window.window_type or window.window_id, 9), window.window_duration_minutes or 0)
+    return (
+        order.get(window.window_type or window.window_id, 9),
+        window.window_duration_minutes or 0,
+    )
 
 
 def _parse_reset(value: Any) -> str | int | None:
@@ -152,7 +155,9 @@ def _normalize_window(window_type: str, payload: Any) -> CodexQuotaWindow | None
     )
 
 
-def _normalize_bucket(payload: Any, fallback_limit_id: str | None = None) -> CodexQuotaBucket | None:
+def _normalize_bucket(
+    payload: Any, fallback_limit_id: str | None = None
+) -> CodexQuotaBucket | None:
     if not isinstance(payload, dict):
         return None
     limit_id = _bounded_text(payload.get("limitId"), max_length=120) or fallback_limit_id
@@ -181,7 +186,9 @@ def _normalize_reset_credits(payload: Any) -> CodexQuotaResetCredits:
     if not isinstance(payload, dict):
         return CodexQuotaResetCredits()
     count = payload.get("availableCount")
-    available = count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else None
+    available = (
+        count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else None
+    )
     raw_credits = payload.get("credits")
     if raw_credits is None:
         credits = None
@@ -193,7 +200,9 @@ def _normalize_reset_credits(payload: Any) -> CodexQuotaResetCredits:
             credit_id = item.get("id")
             credits.append(
                 CodexQuotaResetCreditItem(
-                    credit_id=credit_id if isinstance(credit_id, str) and _SAFE_CREDIT_ID_RE.fullmatch(credit_id) else None,
+                    credit_id=credit_id
+                    if isinstance(credit_id, str) and _SAFE_CREDIT_ID_RE.fullmatch(credit_id)
+                    else None,
                     title=_bounded_text(item.get("title"), max_length=120),
                     expires_at=_parse_reset(item.get("expiresAt")),
                 )
@@ -221,16 +230,22 @@ def normalize_codex_rate_limits_response(
                 seen_ids.add(bucket_id)
             buckets.append(bucket)
     fallback = _normalize_bucket(rate_limits_payload.get("rateLimits"))
-    if fallback is not None and (not buckets or not fallback.limit_id or fallback.limit_id not in seen_ids):
+    if fallback is not None and (
+        not buckets or not fallback.limit_id or fallback.limit_id not in seen_ids
+    ):
         buckets.append(fallback)
     buckets.sort(key=_bucket_sort_key)
 
     compat_windows: list[CodexQuotaWindow] = []
     for bucket in buckets:
         for window in bucket.windows:
-            if window.window_duration_minutes == 300 and not any(item.window_id == "primary" for item in compat_windows):
+            if window.window_duration_minutes == 300 and not any(
+                item.window_id == "primary" for item in compat_windows
+            ):
                 compat_windows.append(window.model_copy(update={"window_id": "primary"}))
-            if window.window_duration_minutes == 10080 and not any(item.window_id == "secondary" for item in compat_windows):
+            if window.window_duration_minutes == 10080 and not any(
+                item.window_id == "secondary" for item in compat_windows
+            ):
                 compat_windows.append(window.model_copy(update={"window_id": "secondary"}))
 
     return CodexQuotaSnapshot(
@@ -245,17 +260,23 @@ def normalize_codex_rate_limits_response(
 
 
 def parse_codex_usage_response(
-    *, account_slug: str, endpoint: str, usage_payload: dict[str, Any], fetched_at: datetime | None = None
+    *,
+    account_slug: str,
+    endpoint: str,
+    usage_payload: dict[str, Any],
+    fetched_at: datetime | None = None,
 ) -> CodexQuotaSnapshot:
     fetched_at = fetched_at or _utc_now()
     rate_limit = usage_payload.get("rate_limit")
     if not isinstance(rate_limit, dict):
-        raise CodexQuotaError("response_invalid", "Codex usage response does not contain rate_limit")
+        raise CodexQuotaError(
+            "response_invalid", "Codex usage response does not contain rate_limit"
+        )
     payload = {
         "rateLimits": {
             "limitId": "codex",
-            "primary": _legacy_usage_window(rate_limit.get("primary_window"), fetched_at),
-            "secondary": _legacy_usage_window(rate_limit.get("secondary_window"), fetched_at),
+            "primary": _compat_usage_window(rate_limit.get("primary_window"), fetched_at),
+            "secondary": _compat_usage_window(rate_limit.get("secondary_window"), fetched_at),
         }
     }
     snapshot = normalize_codex_rate_limits_response(
@@ -267,7 +288,7 @@ def parse_codex_usage_response(
     return snapshot
 
 
-def _legacy_usage_window(payload: Any, fetched_at: datetime) -> dict[str, Any] | None:
+def _compat_usage_window(payload: Any, fetched_at: datetime) -> dict[str, Any] | None:
     if not isinstance(payload, dict):
         return None
     result: dict[str, Any] = {}
@@ -361,7 +382,9 @@ def consume_rate_limit_reset_credit(
         uuid.UUID(idempotency_key)
         resolve_profile(settings, slug)
     except ValueError as exc:
-        raise CodexQuotaError("invalid_idempotency_key", "Reset idempotency key must be a UUID") from exc
+        raise CodexQuotaError(
+            "invalid_idempotency_key", "Reset idempotency key must be a UUID"
+        ) from exc
     except CodexAppServerError as exc:
         raise CodexQuotaError(exc.code, exc.message) from exc
     params: dict[str, str] = {"idempotencyKey": idempotency_key}
@@ -390,7 +413,11 @@ def consume_rate_limit_reset_credit(
         raise CodexQuotaError("unexpected_outcome", "Codex reset-credit outcome is unexpected")
     quota = None
     if outcome in {"reset", "alreadyRedeemed"}:
-        quota = refresh_after() if refresh_after is not None else refresh_codex_quota(slug, settings=settings)
+        quota = (
+            refresh_after()
+            if refresh_after is not None
+            else refresh_codex_quota(slug, settings=settings)
+        )
     return CodexRateLimitResetCreditConsumeResponse(
         account_slug=slug,
         outcome=outcome,

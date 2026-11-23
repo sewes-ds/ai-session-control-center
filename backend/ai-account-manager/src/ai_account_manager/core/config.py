@@ -51,11 +51,9 @@ class AppSettings:
     ai_profiles_root: Path
     ai_quota_cache_root: Path
     runtime_data_root: Path
-    project_bindings_path: Path
     telegram_ai_agent_root: Path
     telegram_ai_agent_topic_config_path: Path
     telegram_ai_agent_tmux_state_path: Path
-    telegram_ai_agent_compatibility_manifest: Path
     codex_usage_endpoint: str
     codex_binary: Path
     codex_auth_enrollment_root: Path
@@ -65,9 +63,6 @@ class AppSettings:
     enable_provider_claude_code: bool
     enable_provider_gemini_cli: bool
     codex_openviking_seed_account: str = ""
-    telegram_ai_agent_control_socket: Path = Path(
-        _DEFAULT_RUNTIME_ROOT / "telegram-ai-agent-control.sock"
-    )
     ai_project_roots: tuple[Path, ...] = ()
     miniapp_static_root: Path = Path("frontend/telegram-miniapp")
     preview_access_token: str = ""
@@ -80,36 +75,21 @@ class AppSettings:
     cus_onboarding_token_ttl_seconds: int = 1800
     telegram_allowed_user_ids: tuple[int, ...] = ()
     telegram_init_data_max_age_seconds: int = 3600
-    codex_capabilities_cache_root: Path = Path(
-        _DEFAULT_RUNTIME_ROOT / "codex_capabilities"
-    )
+    codex_capabilities_cache_root: Path = Path(_DEFAULT_RUNTIME_ROOT / "codex_capabilities")
     codex_app_server_timeout_seconds: float = 30.0
-    project_settings_path: Path = Path(
-        _DEFAULT_RUNTIME_ROOT / "project_settings_v2.json"
-    )
-    runtime_launch_specs_path: Path = Path(
-        _DEFAULT_RUNTIME_ROOT / "runtime_launch_specs_v1.json"
-    )
-    project_inventory_path: Path = Path(
-        _DEFAULT_RUNTIME_ROOT / "project_inventory_v1.json"
-    )
-    project_activity_path: Path = Path(
-        _DEFAULT_RUNTIME_ROOT / "project_activity_v1.json"
-    )
-    runtime_control_path: Path = Path(
-        _DEFAULT_RUNTIME_ROOT / "runtime_control_v1.json"
-    )
+    project_inventory_path: Path = Path(_DEFAULT_RUNTIME_ROOT / "project_inventory_v1.json")
+    runtime_control_path: Path = Path(_DEFAULT_RUNTIME_ROOT / "runtime_control_v1.json")
     runtime_connector_timeout_seconds: float = 10.0
     runtime_reconcile_enabled: bool = False
     runtime_reconcile_interval_seconds: float = 15.0
     runtime_reconcile_batch_size: int = 50
-    claude_code_binary: Path = Path("/home/devops/.local/bin/claude")
+    claude_code_binary: Path = _DEFAULT_HOME / ".local/bin/claude"
     deepseek_api_key_path: Path = Path(
-        "/home/devops/.config/ai-session-control-center/credentials/deepseek/default.token"
+        _DEFAULT_HOME / ".config/ai-session-control-center/credentials/deepseek/default.token"
     )
     deepseek_api_base_url: str = "https://api.deepseek.com"
     deepseek_balance_cache_path: Path = Path(
-        "/home/devops/.ai_session_control_center/deepseek_balance_v1.json"
+        _DEFAULT_HOME / ".local/share/ai-session-control-center/deepseek_balance_v1.json"
     )
 
     def __post_init__(self) -> None:
@@ -188,13 +168,9 @@ class AppSettings:
             "ai_project_roots": [str(path) for path in self.ai_project_roots],
             "ai_quota_cache_root": str(self.ai_quota_cache_root),
             "runtime_data_root": str(self.runtime_data_root),
-            "project_settings_path": str(self.project_settings_path),
-            "runtime_launch_specs_path": str(self.runtime_launch_specs_path),
             "project_inventory_path": str(self.project_inventory_path),
-            "project_activity_path": str(self.project_activity_path),
             "runtime_control_path": str(self.runtime_control_path),
             "telegram_ai_agent_root": str(self.telegram_ai_agent_root),
-            "telegram_ai_agent_control_socket": str(self.telegram_ai_agent_control_socket),
             "miniapp_static_root": str(self.miniapp_static_root),
             "preview_access_enabled": bool(self.preview_access_token),
             "telegram_miniapp_auth_enabled": bool(
@@ -217,12 +193,6 @@ def get_settings() -> AppSettings:
     bot_root = Path(
         _env_str("TELEGRAM_AI_AGENT_ROOT", str(_DEFAULT_HOME / "telegram-ai-agent"))
     ).expanduser()
-    compatibility_manifest = Path(
-        _env_str(
-            "TELEGRAM_AI_AGENT_COMPATIBILITY_MANIFEST",
-            "/etc/ai-session-control-center/compatibility.json",
-        )
-    ).expanduser()
     default_miniapp_root = _project_root() / "frontend" / "telegram-miniapp"
     return AppSettings(
         app_env=_env_str("APP_ENV", "development"),
@@ -239,9 +209,6 @@ def get_settings() -> AppSettings:
             _env_str("AI_QUOTA_CACHE_ROOT", str(runtime_root / "quota_snapshots"))
         ).expanduser(),
         runtime_data_root=runtime_root,
-        project_bindings_path=Path(
-            _env_str("PROJECT_BINDINGS_PATH", str(runtime_root / "project_bindings.json"))
-        ).expanduser(),
         telegram_ai_agent_root=bot_root,
         telegram_ai_agent_topic_config_path=Path(
             _env_str("TELEGRAM_AI_AGENT_TOPIC_CONFIG_PATH", str(bot_root / "topic_config.json"))
@@ -250,13 +217,6 @@ def get_settings() -> AppSettings:
             _env_str(
                 "TELEGRAM_AI_AGENT_TMUX_STATE_PATH",
                 str(bot_root / "tmux_sessions" / "state.json"),
-            )
-        ).expanduser(),
-        telegram_ai_agent_compatibility_manifest=compatibility_manifest,
-        telegram_ai_agent_control_socket=Path(
-            _env_str(
-                "TELEGRAM_AI_AGENT_CONTROL_SOCKET",
-                str(runtime_root / "telegram-ai-agent-control.sock"),
             )
         ).expanduser(),
         codex_usage_endpoint=_env_str(
@@ -286,20 +246,8 @@ def get_settings() -> AppSettings:
             greater_than=0.0,
             maximum=120.0,
         ),
-        project_settings_path=Path(
-            _env_str("PROJECT_SETTINGS_PATH", str(runtime_root / "project_settings_v2.json"))
-        ).expanduser(),
-        runtime_launch_specs_path=Path(
-            _env_str(
-                "RUNTIME_LAUNCH_SPECS_PATH",
-                str(runtime_root / "runtime_launch_specs_v1.json"),
-            )
-        ).expanduser(),
         project_inventory_path=Path(
             _env_str("PROJECT_INVENTORY_PATH", str(runtime_root / "project_inventory_v1.json"))
-        ).expanduser(),
-        project_activity_path=Path(
-            _env_str("PROJECT_ACTIVITY_PATH", str(runtime_root / "project_activity_v1.json"))
         ).expanduser(),
         runtime_control_path=Path(
             _env_str("RUNTIME_CONTROL_PATH", str(runtime_root / "runtime_control_v1.json"))
@@ -345,12 +293,15 @@ def get_settings() -> AppSettings:
         enable_provider_claude_code=_env_bool("ENABLE_PROVIDER_CLAUDE_CODE", False),
         enable_provider_gemini_cli=_env_bool("ENABLE_PROVIDER_GEMINI_CLI", False),
         claude_code_binary=Path(
-            _env_str("CLAUDE_CODE_BINARY", "/home/devops/.local/bin/claude")
+            _env_str("CLAUDE_CODE_BINARY", str(_DEFAULT_HOME / ".local/bin/claude"))
         ).expanduser(),
         deepseek_api_key_path=Path(
             _env_str(
                 "DEEPSEEK_API_KEY_PATH",
-                "/home/devops/.config/ai-session-control-center/credentials/deepseek/default.token",
+                str(
+                    _DEFAULT_HOME
+                    / ".config/ai-session-control-center/credentials/deepseek/default.token"
+                ),
             )
         ).expanduser(),
         deepseek_api_base_url=_env_str("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com"),

@@ -49,36 +49,22 @@ def configured_project_paths(
     *,
     settings: AppSettings | None = None,
 ) -> tuple[Path, ...]:
-    """Return the provider's centrally configured project identities.
-
-    The project settings store is the source of truth. Provider profiles are
-    projections only and never define whether a CUS project is trusted.
-    """
+    """Return project identities from the authoritative Runtime control store."""
 
     settings = settings or get_settings()
-    from ai_account_manager.core.project_settings import (
-        ProjectSettingsError,
-        canonical_project_path,
-        read_project_settings_store,
-    )
+    from ai_account_manager.core.runtime_control import read_runtime_control_store
 
-    store, _migration_required = read_project_settings_store(settings)
-    projects = store.get("projects", {})
+    store = read_runtime_control_store(settings.runtime_control_path)
     paths: set[Path] = set()
-    for raw in projects.values():
-        if not isinstance(raw, dict) or raw.get("provider_id") != provider_id:
+    for binding in store.bindings.values():
+        if binding.lifecycle_status != "CONFIGURED" or binding.desired.provider != provider_id:
             continue
-        value = raw.get("project_path")
-        if not isinstance(value, str):
-            raise ProjectTrustError(
-                "project_trust_source_invalid", "Configured project path is invalid"
-            )
-        try:
-            paths.add(canonical_project_path(value, settings))
-        except ProjectSettingsError as exc:
+        path = Path(binding.canonical_cwd).expanduser().resolve(strict=False)
+        if not path.is_dir():
             raise ProjectTrustError(
                 "project_trust_source_invalid", "Configured project identity is unavailable"
-            ) from exc
+            )
+        paths.add(path)
     return tuple(sorted(paths, key=str))
 
 

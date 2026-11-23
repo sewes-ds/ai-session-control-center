@@ -45,7 +45,6 @@
     enrollmentId: null,
     enrollmentPoll: null,
     projects: [],
-    projectSettings: [],
     projectView: [],
     runtimeBindingHealth: new Map(),
     accounts: [],
@@ -94,9 +93,6 @@
     quotaAutoRefreshGeneration: 0,
     quotaInitialRefreshInFlight: false,
     quotaInitialRefreshGeneration: 0,
-    runtimeSelectionAutoRefreshGeneration: 0,
-    runtimeSelectionInitialRefreshInFlight: false,
-    runtimeSelectionInitialRefreshGeneration: 0,
     quotaFreshnessByAccount: new Map(),
     telegramEventSource: null,
     cleanupComplete: false,
@@ -135,10 +131,6 @@
     accountEnrollError: document.getElementById("accountEnrollError"),
     closeDialogButtons: Array.from(document.querySelectorAll("[data-close-dialog]")),
     projectSettingsDialog: document.getElementById("projectSettingsDialog"),
-    settingsPathStep: document.getElementById("settingsPathStep"),
-    settingsPathInput: document.getElementById("settingsPathInput"),
-    settingsPathError: document.getElementById("settingsPathError"),
-    bindProjectPathButton: document.getElementById("bindProjectPathButton"),
     settingsEditStep: document.getElementById("settingsEditStep"),
     settingsConfirmStep: document.getElementById("settingsConfirmStep"),
     settingsProjectTopic: document.getElementById("settingsProjectTopic"),
@@ -401,14 +393,12 @@
   function clearPrivateContent() {
     state.accounts = [];
     state.projects = [];
-    state.projectSettings = [];
     state.projectView = [];
     state.projectsLoaded = false;
     state.pendingProjectUpdate = null;
     state.capabilityCache.clear();
     state.accountDetails.clear();
     state.quotaFreshnessByAccount.clear();
-    state.runtimeSelectionInitialRefreshInFlight = false;
     state.resetCreditActions.clear();
     state.resetCreditActionCounter = 0;
     elements.accountsList.replaceChildren();
@@ -691,9 +681,7 @@
   }
 
   function mergeProjectView() {
-    const settingsByPath = new Map(state.projectSettings.map((record) => [record.project_path, record]));
     state.projectView = state.projects.map((project) => {
-      const settings = project.project_path ? settingsByPath.get(project.project_path) || null : null;
       const runtimeHealthKey = Number.isInteger(project.chat_id) && Number.isInteger(project.thread_id)
         ? `${project.chat_id}:${project.thread_id}`
         : "";
@@ -718,7 +706,6 @@
       }[runtimeBinding?.activity];
       return {
         ...project,
-        settings,
         agent: managedDesired?.provider || project.agent,
         onboarding_state: managedDesired ? "CONFIGURED" : project.onboarding_state,
         missing_launch_fields: managedDesired ? [] : project.missing_launch_fields,
@@ -730,17 +717,12 @@
         current_account_profile: currentApplied?.account_profile || project.account_slug || null,
         runtime_selection_status: currentApplied ? "current" : project.runtime_selection_status,
         desired_is_applied: desiredIsApplied,
-        project_id: settings?.project_id || project.project_id || null,
-        revision: settings?.revision ?? null,
-        provider_id: settings?.provider_id || null,
-        account_profile: managedDesired?.account_profile || settings?.account_profile || null,
-        model: managedDesired?.model || settings?.model || null,
-        reasoning_effort: managedDesired?.reasoning_effort || settings?.reasoning_effort || null,
-        runtime_account_profile: settings?.runtime_account_profile || null,
-        runtime_model: settings?.runtime_model || null,
-        runtime_reasoning_effort: settings?.runtime_reasoning_effort || null,
-        runtime_settings_revision: settings?.runtime_settings_revision ?? null,
-        runtime_application_status: settings?.runtime_application_status || "missing",
+        project_id: runtimeBinding?.project_id || project.project_id || null,
+        revision: managedDesired?.revision ?? null,
+        provider_id: managedDesired?.provider || project.agent || null,
+        account_profile: managedDesired?.account_profile || project.account_slug || null,
+        model: managedDesired?.model || null,
+        reasoning_effort: managedDesired?.reasoning_effort || null,
         runtime_binding_health: runtimeBinding,
       };
     });
@@ -1080,12 +1062,10 @@
 
   function applyProjectPayload(
     projectsResponse,
-    settingsResponse,
     { background = false, runtimeHealthResponse = null } = {},
   ) {
     const anchor = background ? captureProjectScrollAnchor() : null;
     state.projects = projectsResponse.projects || [];
-    state.projectSettings = settingsResponse.projects || [];
     if (runtimeHealthResponse) {
       state.runtimeBindingHealth = new Map(
         (runtimeHealthResponse.bindings || []).map((binding) => [
@@ -1110,7 +1090,7 @@
     if (!state.pendingProjectUpdate || shouldDeferProjectUpdate()) return;
     const pending = state.pendingProjectUpdate;
     state.pendingProjectUpdate = null;
-    applyProjectPayload(pending.projectsResponse, pending.settingsResponse, {
+    applyProjectPayload(pending.projectsResponse, {
       background: true,
       runtimeHealthResponse: pending.runtimeHealthResponse || null,
     });
@@ -1435,25 +1415,22 @@
     }
   }
 
-  async function loadProjects({ background = false, refreshRuntimeSelection = false } = {}) {
+  async function loadProjects({ background = false } = {}) {
     if (state.authStatus !== "ready") return false;
     setNotice(elements.projectsStatus, "");
     if (!background && !state.projectsLoaded) {
       renderSkeleton(elements.projectsList, 1);
     }
     try {
-      const [projectsResponse, settingsResponse, runtimeHealthResponse] = await Promise.all([
-        refreshRuntimeSelection
-          ? runtimeSelectionRefresh()
-          : apiRequest("/api/sessions/projects"),
-        apiRequest("/api/sessions/project-settings"),
+      const [projectsResponse, runtimeHealthResponse] = await Promise.all([
+        apiRequest("/api/sessions/projects"),
         apiRequest("/api/runtime/bindings/health"),
       ]);
       if (background && shouldDeferProjectUpdate()) {
-        state.pendingProjectUpdate = { projectsResponse, settingsResponse, runtimeHealthResponse };
+        state.pendingProjectUpdate = { projectsResponse, runtimeHealthResponse };
         return;
       }
-      applyProjectPayload(projectsResponse, settingsResponse, { background, runtimeHealthResponse });
+      applyProjectPayload(projectsResponse, { background, runtimeHealthResponse });
       if (!background) scheduleProjectPoll();
       return true;
     } catch (error) {
@@ -1605,8 +1582,7 @@
     elements.refreshButton.title = label;
     elements.refreshButton.disabled = state.authStatus !== "ready"
       || state.topRefreshInFlight
-      || (state.activeTab === "accounts" && state.quotaInitialRefreshInFlight)
-      || (state.activeTab === "projects" && state.runtimeSelectionInitialRefreshInFlight);
+      || (state.activeTab === "accounts" && state.quotaInitialRefreshInFlight);
   }
 
   async function runBoundedWorkers(items, worker, concurrency = 2) {
@@ -1727,53 +1703,12 @@
     }
   }
 
-  function runtimeSelectionRefresh() {
-    return apiRequest("/api/sessions/runtime-selection/refresh", { method: "POST" });
-  }
-
-  async function refreshInitialRuntimeSelections(generation) {
-    try {
-      const projectsResponse = await runtimeSelectionRefresh();
-      if (
-        state.authStatus === "ready"
-        && state.authReadyGeneration === generation
-        && state.activeTab === "projects"
-        && state.projectsLoaded
-      ) {
-        const settingsResponse = await apiRequest("/api/sessions/project-settings");
-        applyProjectPayload(projectsResponse, settingsResponse, { background: true });
-      }
-    } catch (error) {
-      if (
-        state.authStatus === "ready"
-        && state.authReadyGeneration === generation
-        && state.activeTab === "projects"
-        && !isAuthUnavailableError(error)
-      ) {
-        setNotice(elements.projectsStatus, "Текущие параметры Codex определить не удалось.", "error");
-      }
-    } finally {
-      if (state.runtimeSelectionInitialRefreshGeneration === generation) {
-        state.runtimeSelectionInitialRefreshInFlight = false;
-        updateRefreshButtonContext();
-      }
-    }
-  }
-
   async function refreshProjectsState() {
     if (state.topRefreshInFlight) return;
     state.topRefreshInFlight = true;
     updateRefreshButtonContext();
     try {
-      const [projectsResponse, settingsResponse] = await Promise.all([
-        runtimeSelectionRefresh(),
-        apiRequest("/api/sessions/project-settings"),
-      ]);
-      if (shouldDeferProjectUpdate()) {
-        state.pendingProjectUpdate = { projectsResponse, settingsResponse };
-      } else {
-        applyProjectPayload(projectsResponse, settingsResponse, { background: true });
-      }
+      await loadProjects({ background: true });
     } catch (error) {
       if (!isAuthUnavailableError(error)) {
         setNotice(elements.projectsStatus, `Не удалось обновить текущие параметры: ${error.message}`, "error");
@@ -1994,7 +1929,6 @@
 
   function preferredAccount(project) {
     return project.account_profile
-      || project.runtime_account_profile
       || project.account_slug
       || authorizedAccounts(state.settingsDialog.selections.provider)[0]?.account_slug
       || "";
@@ -2013,7 +1947,7 @@
   }
 
   function visibleModels(project, snapshot) {
-    const savedModel = project.model || project.runtime_model || "";
+    const savedModel = project.model || "";
     return modelsFromCapabilities(snapshot).filter((model) => model.hidden !== true || model.model_id === savedModel);
   }
 
@@ -2039,8 +1973,6 @@
   function setSettingsBusy(isBusy) {
     state.settingsDialog.busy = isBusy;
     const controls = [
-      elements.settingsPathInput,
-      elements.bindProjectPathButton,
       elements.settingsProviderSelect,
       elements.settingsAccountSelect,
       elements.settingsModelSelect,
@@ -2506,23 +2438,21 @@
     const onboarding = project?.onboarding_state === "UNCONFIGURED";
     const managedBinding = project?.runtime_binding_health?.lifecycle_status === "CONFIGURED";
     if (!project || (!onboarding && !managedBinding && !project.project_path)) return;
+    if (onboarding && !managedBinding) {
+      setNotice(
+        elements.projectsStatus,
+        "Откройте кнопку «Настроить в ЦУС» в Telegram-топике. Она безопасно привяжет topic к Runtime.",
+        "warning",
+      );
+      return;
+    }
     state.settingsDialog.project = project;
     state.settingsDialog.path = project.project_path || "";
-    setNotice(elements.settingsPathError, "");
     setNotice(elements.settingsEditNotice, "");
     setNotice(elements.settingsEditError, "");
     setNotice(elements.settingsConfirmError, "");
     elements.projectSettingsDialog.classList.remove("is-hidden");
     showTelegramBackButton(handleSettingsBack);
-    if (onboarding && !project.project_path) {
-      state.settingsDialog.step = "path";
-      elements.settingsPathInput.value = "";
-      elements.settingsPathStep.classList.remove("is-hidden");
-      elements.settingsEditStep.classList.add("is-hidden");
-      elements.settingsConfirmStep.classList.add("is-hidden");
-      setTimeout(() => elements.settingsPathInput.focus(), 30);
-      return;
-    }
     if (!authorizedAccounts().length) {
       closeProjectSettingsDialog({ force: true });
       setNotice(elements.projectsStatus, "Нет готового аккаунта ИИ. Проверьте вкладку «Аккаунты».");
@@ -2540,10 +2470,9 @@
       account: managedBinding
         ? project.runtime_binding_health.desired.account_profile
         : authorizedAccounts(selectedProvider)[0]?.account_slug || "",
-      model: project.model || project.runtime_model || "",
-      reasoning: project.reasoning_effort || project.runtime_reasoning_effort || "",
+      model: project.model || "",
+      reasoning: project.reasoning_effort || "",
     };
-    elements.settingsPathStep.classList.add("is-hidden");
     elements.settingsEditStep.classList.remove("is-hidden");
     elements.settingsConfirmStep.classList.add("is-hidden");
     await renderSettingsForm(project);
@@ -2571,47 +2500,7 @@
   function showSettingsEditStep() {
     state.settingsDialog.step = "edit";
     elements.settingsConfirmStep.classList.add("is-hidden");
-    elements.settingsPathStep.classList.add("is-hidden");
     elements.settingsEditStep.classList.remove("is-hidden");
-  }
-
-  async function bindProjectPath() {
-    const project = state.settingsDialog.project;
-    if (!project || state.settingsDialog.busy) return;
-    const projectPath = elements.settingsPathInput.value.trim();
-    setSettingsBusy(true);
-    setNotice(elements.settingsPathError, "");
-    try {
-      const response = await apiRequest("/api/sessions/project-onboarding/bind-path", {
-        method: "POST",
-        body: JSON.stringify({ project_id: project.project_id, project_path: projectPath }),
-      });
-      if (response.status !== "bound") {
-        throw new ApiError("Backend не подтвердил привязку пути.", { code: "PATH_INVALID" });
-      }
-      closeProjectSettingsDialog({ force: true });
-      await loadProjects();
-      mergeProjectView();
-      const rebound = state.projectView.find((item) => (
-        item.chat_id === response.chat_id
-        && item.thread_id === response.thread_id
-        && item.project_path === response.project_path
-      ));
-      if (!rebound) {
-        setNotice(elements.projectsStatus, "Путь привязан. Обновите состояние проектов для продолжения.", "warning");
-        return;
-      }
-      if (!authorizedAccounts().length) {
-        setNotice(elements.projectsStatus, "Путь привязан. Теперь подготовьте аккаунт ИИ.", "success");
-        switchTab("accounts");
-        return;
-      }
-      await openProjectSettingsDialog(projectKey(rebound));
-    } catch (error) {
-      setNotice(elements.settingsPathError, error.message, "error");
-    } finally {
-      setSettingsBusy(false);
-    }
   }
 
   function settingsPayload() {
@@ -2626,7 +2515,7 @@
   }
 
   async function validateSettingsPayload() {
-    const validation = await apiRequest("/api/sessions/project-settings/validate", {
+    const validation = await apiRequest("/api/runtime/selection/validate", {
       method: "POST",
       body: JSON.stringify(settingsPayload()),
     });
@@ -2727,7 +2616,6 @@
     setClosingConfirmation(true);
     setNotice(elements.settingsConfirmError, "");
     try {
-      const onboarding = project.onboarding_state === "UNCONFIGURED";
       const binding = project.runtime_binding_health?.lifecycle_status === "CONFIGURED"
         ? project.runtime_binding_health
         : null;
@@ -2763,40 +2651,9 @@
         );
         return;
       }
-      const endpoint = onboarding
-        ? "/api/sessions/project-onboarding/apply"
-        : "/api/sessions/project-settings/apply-selection";
-      const applyResponse = await apiRequest(endpoint, {
-        method: "POST",
-        body: JSON.stringify({
-          ...settingsPayload(),
-          expected_settings_revision: project.revision ?? null,
-          ...(onboarding
-            ? { confirm: true }
-            : { confirm_interrupt: true, allow_last_known_good: false }),
-        }),
-      });
-      if (!["applied", "no_change", "configured"].includes(applyResponse.status)) {
-        throw new ApiError("Backend не подтвердил применение настроек.", { code: "apply_status_unexpected" });
-      }
-      closeProjectSettingsDialog({ force: true });
-      const refreshed = await loadProjects({ refreshRuntimeSelection: true });
-      if (!refreshed) {
-        setNotice(
-          elements.projectsStatus,
-          "Настройки применены, но карточку не удалось обновить. Нажмите «Обновить состояние проектов».",
-          "warning",
-        );
-        return;
-      }
-      setNotice(
-        elements.projectsStatus,
-        applyResponse.status === "configured"
-          ? "Настройка завершена. Отправьте следующее сообщение в Telegram-топике — оно запустит Codex с выбранными параметрами."
-          : applyResponse.status === "no_change"
-          ? "Выбранные настройки уже применены."
-          : "Настройки применены. Проект запущен с выбранными параметрами.",
-        "success",
+      throw new ApiError(
+        "Runtime binding отсутствует. Откройте кнопку «Настроить в ЦУС» в Telegram-топике.",
+        { code: "runtime_binding_missing" },
       );
     } catch (error) {
       await loadProjects();
@@ -3130,17 +2987,10 @@
       return;
     }
     const initialQuotaRefresh = state.quotaAutoRefreshGeneration !== generation;
-    const initialRuntimeSelectionRefresh = state.runtimeSelectionAutoRefreshGeneration !== generation;
     if (initialQuotaRefresh) {
       state.quotaAutoRefreshGeneration = generation;
       state.quotaInitialRefreshInFlight = true;
       state.quotaInitialRefreshGeneration = generation;
-      updateRefreshButtonContext();
-    }
-    if (initialRuntimeSelectionRefresh) {
-      state.runtimeSelectionAutoRefreshGeneration = generation;
-      state.runtimeSelectionInitialRefreshInFlight = true;
-      state.runtimeSelectionInitialRefreshGeneration = generation;
       updateRefreshButtonContext();
     }
     const accountsLoaded = await loadAccounts({ initialQuotaRefresh });
@@ -3153,14 +3003,6 @@
         void refreshInitialAccountQuotas(generation);
       } else if (state.quotaInitialRefreshGeneration === generation) {
         state.quotaInitialRefreshInFlight = false;
-        updateRefreshButtonContext();
-      }
-    }
-    if (initialRuntimeSelectionRefresh) {
-      if (state.authStatus === "ready" && state.authReadyGeneration === generation) {
-        void refreshInitialRuntimeSelections(generation);
-      } else if (state.runtimeSelectionInitialRefreshGeneration === generation) {
-        state.runtimeSelectionInitialRefreshInFlight = false;
         updateRefreshButtonContext();
       }
     }
@@ -3280,7 +3122,6 @@
   elements.refreshCapabilitiesButton.addEventListener("click", refreshSelectedCapabilities);
   elements.openApplyConfirmationButton.addEventListener("click", openApplyConfirmation);
   elements.confirmApplySettingsButton.addEventListener("click", confirmApplySettings);
-  elements.bindProjectPathButton.addEventListener("click", bindProjectPath);
   elements.backToSettingsEditButton.addEventListener("click", showSettingsEditStep);
   elements.retryAuthButton.addEventListener("click", () => {
     if (state.authStatus === "pending") return;

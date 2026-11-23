@@ -474,7 +474,7 @@ def test_configured_binding_selection_is_topic_scoped_and_never_interrupts(
         allow_member,
     )
     monkeypatch.setattr(
-        "ai_account_manager.api.routes.runtime.validate_provider_project_settings",
+        "ai_account_manager.api.routes.runtime.validate_provider_selection",
         lambda **_kwargs: SimpleNamespace(status="valid", capability_source="current"),
     )
     monkeypatch.setattr("ai_account_manager.api.routes.runtime.RuntimeConnector", FakeConnector)
@@ -551,7 +551,7 @@ def test_onboarding_api_reports_success_only_after_runtime_ack_and_retries_safel
         allow_member,
     )
     monkeypatch.setattr(
-        "ai_account_manager.api.routes.onboarding.validate_provider_project_settings",
+        "ai_account_manager.api.routes.onboarding.validate_provider_selection",
         lambda **_kwargs: None,
     )
 

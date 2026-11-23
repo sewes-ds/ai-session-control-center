@@ -12,7 +12,7 @@ from typing import Any, Iterator
 from pydantic import BaseModel, Field, ValidationError
 
 from ai_account_manager.core.config import AppSettings, get_settings
-from ai_account_manager.core.project_settings import project_id_for_path
+from ai_account_manager.core.selection import project_id_for_path
 
 STORE_VERSION = 1
 _MAX_STORE_BYTES = 1024 * 1024
@@ -42,7 +42,9 @@ class ProjectInventoryRecord(BaseModel):
 
 
 def inventory_id_for_topic(chat_id: int, thread_id: int) -> str:
-    digest = hashlib.sha256(f"telegram_topic:{chat_id}:{thread_id}".encode("utf-8")).hexdigest()[:20]
+    digest = hashlib.sha256(f"telegram_topic:{chat_id}:{thread_id}".encode("utf-8")).hexdigest()[
+        :20
+    ]
     return f"topic_{digest}"
 
 
@@ -52,7 +54,9 @@ def _canonical_topic_config_path(settings: AppSettings) -> str:
 
 def validate_topic_config_key(raw_topic_key: str) -> str:
     if not _TOPIC_CONFIG_KEY_RE.fullmatch(raw_topic_key):
-        raise ProjectInventoryError("invalid_topic_config_key", "Project inventory topic config key is invalid")
+        raise ProjectInventoryError(
+            "invalid_topic_config_key", "Project inventory topic config key is invalid"
+        )
     return raw_topic_key
 
 
@@ -107,7 +111,9 @@ def validate_inventory_project_path(
     if require_allowed_root:
         roots = [root.expanduser().resolve(strict=False) for root in settings.ai_project_roots]
         if not any(resolved == root or _is_relative_to(resolved, root) for root in roots):
-            raise ProjectInventoryError("project_outside_allowed_roots", "Project path is outside AI_PROJECT_ROOTS")
+            raise ProjectInventoryError(
+                "project_outside_allowed_roots", "Project path is outside AI_PROJECT_ROOTS"
+            )
     return str(resolved)
 
 
@@ -128,7 +134,9 @@ def _locked(path: Path) -> Iterator[Path]:
     os.chmod(path.parent, 0o700)
     lock_path = path.with_suffix(path.suffix + ".lock")
     if lock_path.is_symlink():
-        raise ProjectInventoryError("invalid_inventory_path", "Project inventory lock path is invalid")
+        raise ProjectInventoryError(
+            "invalid_inventory_path", "Project inventory lock path is invalid"
+        )
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
     try:
         os.fchmod(fd, 0o600)
@@ -153,7 +161,9 @@ def _load_store(path: Path, settings: AppSettings) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise ProjectInventoryError("inventory_store_invalid", "Project inventory store is invalid") from exc
+        raise ProjectInventoryError(
+            "inventory_store_invalid", "Project inventory store is invalid"
+        ) from exc
     if (
         not isinstance(payload, dict)
         or payload.get("version") != STORE_VERSION
@@ -205,7 +215,9 @@ def _load_store(path: Path, settings: AppSettings) -> dict[str, Any]:
                     raise ValueError
             max_record_revision = max(max_record_revision, record.revision)
         except (ValidationError, ValueError, ProjectInventoryError) as exc:
-            raise ProjectInventoryError("inventory_store_invalid", "Project inventory store is invalid") from exc
+            raise ProjectInventoryError(
+                "inventory_store_invalid", "Project inventory store is invalid"
+            ) from exc
     if int(payload["store_revision"]) < max_record_revision:
         raise ProjectInventoryError("inventory_store_invalid", "Project inventory store is invalid")
     return payload
@@ -226,7 +238,9 @@ def _write_store(path: Path, payload: dict[str, Any]) -> None:
         os.close(parent_fd)
 
 
-def read_project_inventory(settings: AppSettings | None = None) -> dict[str, ProjectInventoryRecord]:
+def read_project_inventory(
+    settings: AppSettings | None = None,
+) -> dict[str, ProjectInventoryRecord]:
     settings = settings or get_settings()
     path = _inventory_path(settings)
     with _locked(path):
@@ -256,7 +270,9 @@ def update_project_inventory_record(
     )
     expected_id = project_id_for_path(canonical)
     if normalized_id != expected_id:
-        raise ProjectInventoryError("project_id_mismatch", "Project inventory id does not match path")
+        raise ProjectInventoryError(
+            "project_id_mismatch", "Project inventory id does not match path"
+        )
     path = _inventory_path(settings)
     with _locked(path):
         store = _load_store(path, settings)
@@ -268,11 +284,15 @@ def update_project_inventory_record(
         )
         if existing is None:
             if expected_revision is not None:
-                raise ProjectInventoryError("revision_conflict", "Project inventory revision conflict")
+                raise ProjectInventoryError(
+                    "revision_conflict", "Project inventory revision conflict"
+                )
             revision = 1
         else:
             if expected_revision != existing.revision:
-                raise ProjectInventoryError("revision_conflict", "Project inventory revision conflict")
+                raise ProjectInventoryError(
+                    "revision_conflict", "Project inventory revision conflict"
+                )
             revision = existing.revision + 1
         record = ProjectInventoryRecord(
             project_id=normalized_id,
@@ -303,7 +323,9 @@ def update_topic_inventory_record(
     normalized_id = validate_inventory_id(project_id)
     expected_id = inventory_id_for_topic(chat_id, thread_id)
     if normalized_id != expected_id:
-        raise ProjectInventoryError("project_id_mismatch", "Project inventory id does not match topic")
+        raise ProjectInventoryError(
+            "project_id_mismatch", "Project inventory id does not match topic"
+        )
     path = _inventory_path(settings)
     with _locked(path):
         store = _load_store(path, settings)
@@ -315,13 +337,23 @@ def update_topic_inventory_record(
         )
         if existing is None:
             if expected_revision is not None:
-                raise ProjectInventoryError("revision_conflict", "Project inventory revision conflict")
+                raise ProjectInventoryError(
+                    "revision_conflict", "Project inventory revision conflict"
+                )
             revision = 1
         else:
-            if existing.identity_kind != "telegram_topic" or existing.chat_id != chat_id or existing.thread_id != thread_id:
-                raise ProjectInventoryError("project_id_mismatch", "Project inventory id does not match topic")
+            if (
+                existing.identity_kind != "telegram_topic"
+                or existing.chat_id != chat_id
+                or existing.thread_id != thread_id
+            ):
+                raise ProjectInventoryError(
+                    "project_id_mismatch", "Project inventory id does not match topic"
+                )
             if expected_revision != existing.revision:
-                raise ProjectInventoryError("revision_conflict", "Project inventory revision conflict")
+                raise ProjectInventoryError(
+                    "revision_conflict", "Project inventory revision conflict"
+                )
             revision = existing.revision + 1
         record = ProjectInventoryRecord(
             project_id=normalized_id,
@@ -354,7 +386,9 @@ def update_config_topic_inventory_record(
     key = validate_topic_config_key(topic_config_key)
     expected_id = inventory_id_for_config_topic(_canonical_topic_config_path(settings), key)
     if normalized_id != expected_id:
-        raise ProjectInventoryError("project_id_mismatch", "Project inventory id does not match topic config entry")
+        raise ProjectInventoryError(
+            "project_id_mismatch", "Project inventory id does not match topic config entry"
+        )
     path = _inventory_path(settings)
     with _locked(path):
         store = _load_store(path, settings)
@@ -366,13 +400,19 @@ def update_config_topic_inventory_record(
         )
         if existing is None:
             if expected_revision is not None:
-                raise ProjectInventoryError("revision_conflict", "Project inventory revision conflict")
+                raise ProjectInventoryError(
+                    "revision_conflict", "Project inventory revision conflict"
+                )
             revision = 1
         else:
             if existing.identity_kind != "topic_config_entry" or existing.topic_config_key != key:
-                raise ProjectInventoryError("project_id_mismatch", "Project inventory id does not match topic config entry")
+                raise ProjectInventoryError(
+                    "project_id_mismatch", "Project inventory id does not match topic config entry"
+                )
             if expected_revision != existing.revision:
-                raise ProjectInventoryError("revision_conflict", "Project inventory revision conflict")
+                raise ProjectInventoryError(
+                    "revision_conflict", "Project inventory revision conflict"
+                )
             revision = existing.revision + 1
         record = ProjectInventoryRecord(
             project_id=normalized_id,

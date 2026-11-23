@@ -47,7 +47,6 @@ class DesiredSpecRecord(BaseModel):
     source_kind: Literal[
         "cus_ui",
         "observed_runtime",
-        "migration",
         "snapshot",
         "project_relocation",
     ]

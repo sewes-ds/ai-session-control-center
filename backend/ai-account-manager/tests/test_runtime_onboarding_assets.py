@@ -39,7 +39,7 @@ def test_topic_onboarding_closes_only_after_configured_backend_response() -> Non
     assert "Настройка завершена. Возвращаемся в Telegram" in javascript
 
 
-def test_legacy_cus_command_is_not_presented_as_entrypoint() -> None:
+def test_cus_command_is_not_presented_as_entrypoint() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
 
     assert "через команду /cus" not in html
@@ -61,12 +61,15 @@ def test_managed_binding_settings_use_non_interrupting_runtime_path() -> None:
     javascript = (MINIAPP / "assets" / "app.js").read_text(encoding="utf-8")
 
     assert "`topic:${project.chat_id}:${project.thread_id}`" in javascript
-    assert "managedDesired?.account_profile || settings?.account_profile" in javascript
-    assert "project.runtime_binding_health?.lifecycle_status === \"CONFIGURED\"" in javascript
+    assert "managedDesired?.account_profile || project.account_slug" in javascript
+    assert 'project.runtime_binding_health?.lifecycle_status === "CONFIGURED"' in javascript
     assert "/api/runtime/bindings/${encodeURIComponent(binding.binding_id)}/selection" in javascript
-    managed_start = javascript.index("if (binding) {", javascript.index("async function confirmApplySettings"))
-    legacy_start = javascript.index("const endpoint = onboarding", managed_start)
-    managed_branch = javascript[managed_start:legacy_start]
+    managed_start = javascript.index(
+        "if (binding) {", javascript.index("async function confirmApplySettings")
+    )
+    managed_branch = javascript[
+        managed_start : javascript.index("throw new ApiError(", managed_start)
+    ]
     assert "expected_spec_digest: binding.desired.spec_digest" in managed_branch
     assert "confirm_interrupt" not in managed_branch
     assert "Активная задача не прервётся" in javascript

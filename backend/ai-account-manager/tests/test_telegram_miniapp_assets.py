@@ -55,13 +55,12 @@ def test_native_enrollment_has_no_password_field() -> None:
     assert "/api/providers/codex/account-enrollments" in javascript
 
 
-def test_project_runtime_settings_ui_replaces_legacy_switch_flow() -> None:
+def test_project_runtime_settings_ui_uses_binding_api_only() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
     javascript = (MINIAPP / "assets" / "app.js").read_text(encoding="utf-8")
 
-    assert "/api/sessions/project-settings" in javascript
-    assert "/api/sessions/project-settings/validate" in javascript
-    assert "/api/sessions/project-settings/apply-selection" in javascript
+    assert "/api/runtime/selection/validate" in javascript
+    assert "/api/runtime/bindings/${encodeURIComponent(binding.binding_id)}/selection" in javascript
     assert "/capabilities" in javascript
     assert "/capabilities/refresh" in javascript
     assert "/api/sessions/switch-account" not in javascript
@@ -88,21 +87,18 @@ def test_agent_switch_remains_deferred() -> None:
     assert "Смена агента будет реализована отдельно" in javascript
 
 
-def test_settings_merge_keeps_live_and_next_launch_values_separate() -> None:
+def test_binding_health_keeps_live_and_next_launch_values_separate() -> None:
     javascript = (MINIAPP / "assets" / "app.js").read_text(encoding="utf-8")
 
     assert "Promise.all([" in javascript
     assert 'apiRequest("/api/sessions/projects")' in javascript
-    assert 'apiRequest("/api/sessions/project-settings")' in javascript
-    assert "settingsByPath.get(project.project_path)" in javascript
+    assert 'apiRequest("/api/runtime/bindings/health")' in javascript
     assert "project_path" in javascript
     assert "topic_name" in javascript
     assert "account_profile" in javascript
-    assert "runtime_account_profile" in javascript
-    assert "runtime_model" in javascript
-    assert "runtime_reasoning_effort" in javascript
-    assert "runtime_settings_revision" in javascript
-    assert "runtime_application_status" in javascript
+    assert "managedDesired?.account_profile" in javascript
+    assert "managedDesired?.model" in javascript
+    assert "managedDesired?.reasoning_effort" in javascript
     assert "runtime_selection_status" in javascript
     assert "current_model" in javascript
     assert "current_reasoning_effort" in javascript
@@ -130,37 +126,35 @@ def test_runtime_selection_ui_fails_closed_without_diff_or_timestamp() -> None:
 def test_validation_and_unified_apply_payload_contracts() -> None:
     javascript = (MINIAPP / "assets" / "app.js").read_text(encoding="utf-8")
 
-    validate_index = javascript.index('apiRequest("/api/sessions/project-settings/validate"')
-    apply_index = javascript.index('"/api/sessions/project-settings/apply-selection"')
+    validate_index = javascript.index('apiRequest("/api/runtime/selection/validate"')
+    apply_index = javascript.index(
+        "/api/runtime/bindings/${encodeURIComponent(binding.binding_id)}/selection"
+    )
     assert validate_index < apply_index
-    assert 'apiRequest("/api/sessions/project-settings",' not in javascript
     assert 'method: "PUT"' not in _javascript_function(javascript, "confirmApplySettings")
-    assert "expected_settings_revision: project.revision ?? null" in javascript
-    assert "confirm_interrupt: true" in javascript
-    assert "allow_last_known_good: false" in javascript
-    assert "allow_last_known_good: true" not in javascript
+    assert "expected_generation_id: binding.desired.generation_id" in javascript
+    assert "expected_revision: binding.desired.revision" in javascript
+    assert "expected_spec_digest: binding.desired.spec_digest" in javascript
+    assert "confirm_interrupt" not in javascript
     confirm = _javascript_function(javascript, "confirmApplySettings")
-    assert confirm.count("/project-settings/apply-selection") == 1
-    assert confirm.count("/project-onboarding/apply") == 1
+    assert confirm.count("/api/runtime/bindings/") == 1
     assert "validateForApplyWithCurrentCapabilities" not in confirm
     assert "state.settingsDialog.busy" in confirm
     availability = _javascript_function(javascript, "updateApplyAvailability")
     assert "tmux_session_running" not in availability
     opening = _javascript_function(javascript, "openApplyConfirmation")
     assert "validateForApplyWithCurrentCapabilities" in opening
-    assert "/project-settings/apply-selection" not in opening
     assert 'method: "PUT"' not in opening
     assert 'state.settingsDialog.step = "confirm"' in opening
 
 
-def test_new_project_onboarding_is_path_first_and_does_not_start_on_confirmation() -> None:
+def test_new_project_onboarding_uses_topic_token_and_runtime_ack() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
     javascript = (MINIAPP / "assets" / "app.js").read_text(encoding="utf-8")
 
-    assert 'id="settingsPathStep"' in html
-    assert 'id="settingsPathInput"' in html
-    assert "/api/sessions/project-onboarding/bind-path" in javascript
-    assert "/api/sessions/project-onboarding/apply" in javascript
+    assert 'id="onboardingProjectPath"' in html
+    assert "/api/onboarding/${encodeURIComponent(topicOnboardingToken)}/apply" in javascript
+    assert "/api/sessions/project-onboarding" not in javascript
     assert 'project.onboarding_state === "UNCONFIGURED"' in javascript
     assert "Первую tmux-сессию запустит следующее сообщение" in javascript
     assert "Runtime подготовит выбранный provider без немедленного запуска" in javascript
@@ -230,7 +224,7 @@ def test_cache_busting_query_is_deterministic() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
 
     assert "./assets/app.css?v=cus-runtime-onboarding-v1" in html
-    assert "./assets/app.js?v=cus-claude-deepseek-v1" in html
+    assert "./assets/app.js?v=cus-runtime-binding-v2" in html
     assert "?v=" in html
     assert "Date.now()" not in html
 
@@ -332,10 +326,7 @@ def test_contextual_top_refresh_is_bounded_and_non_destructive() -> None:
     assert "window.scrollTo(scrollX, scrollY)" in accounts
     assert "quotaRefreshPath(account.account_slug)" in accounts
     assert "rate-limit-reset-credits" not in accounts
-    assert "/project-settings/apply" not in accounts
-    assert "runtimeSelectionRefresh()" in projects
-    assert 'apiRequest("/api/sessions/project-settings")' in projects
-    assert "loadProjects" not in projects
+    assert "loadProjects({ background: true })" in projects
     assert "quotaRefreshPath" not in projects
     assert "/capabilities" not in projects
     assert "rate-limit-reset-credits" not in projects

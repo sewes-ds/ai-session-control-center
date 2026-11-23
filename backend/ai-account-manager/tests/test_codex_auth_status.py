@@ -19,15 +19,12 @@ def _settings(tmp_path) -> AppSettings:
         ai_quota_cache_root=tmp_path / "quota_cache",
         runtime_data_root=tmp_path / "runtime",
         project_inventory_path=tmp_path / "runtime" / "project_inventory_v1.json",
-        project_activity_path=tmp_path / "runtime" / "project_activity_v1.json",
-        project_bindings_path=tmp_path / "runtime" / "project_bindings.json",
         telegram_ai_agent_root=tmp_path / "telegram-ai-agent",
         telegram_ai_agent_topic_config_path=tmp_path / "telegram-ai-agent" / "topic_config.json",
         telegram_ai_agent_tmux_state_path=tmp_path
         / "telegram-ai-agent"
         / "tmux_sessions"
         / "state.json",
-        telegram_ai_agent_compatibility_manifest=tmp_path / "compatibility.json",
         codex_usage_endpoint="https://chatgpt.com/backend-api/wham/usage",
         codex_binary=tmp_path / "bin" / "codex",
         codex_auth_enrollment_root=tmp_path / "runtime" / "codex_auth_enrollments",

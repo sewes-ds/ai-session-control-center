@@ -154,7 +154,7 @@ def test_observed_policy_uses_provider_adapter_validation(monkeypatch) -> None: 
         captured.append(kwargs)
         return SimpleNamespace(status="valid")
 
-    monkeypatch.setattr(runtime_reconcile_service, "validate_provider_project_settings", validate)
+    monkeypatch.setattr(runtime_reconcile_service, "validate_provider_selection", validate)
     policy = observed_policy(get_settings())
     assert policy(binding, proposal) is True
     assert captured[0]["provider_id"] == "codex"

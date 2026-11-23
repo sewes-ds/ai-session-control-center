@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from ai_account_manager.core.config import AppSettings
-from ai_account_manager.core.project_settings import upsert_project_settings
+from ai_account_manager.core.runtime_control import register_agent_instance, upsert_runtime_binding
 from ai_account_manager.providers.codex.account_enrollment import (
     CodexAccountEnrollmentError,
     cancel_codex_account_enrollment,
@@ -17,6 +17,12 @@ from ai_account_manager.providers.codex.account_enrollment import (
     start_codex_account_enrollment,
 )
 from ai_account_manager.providers.codex import openviking_defaults
+from ai_account_manager.schemas.runtime_control import (
+    AgentInstanceRecord,
+    DesiredSpecRecord,
+    RuntimeBindingRecord,
+    canonical_digest,
+)
 
 
 class _FakeProcess:
@@ -41,12 +47,9 @@ def _settings(tmp_path: Path) -> AppSettings:
         ai_quota_cache_root=tmp_path / "quota_cache",
         runtime_data_root=tmp_path / "runtime",
         project_inventory_path=tmp_path / "runtime" / "project_inventory_v1.json",
-        project_activity_path=tmp_path / "runtime" / "project_activity_v1.json",
-        project_bindings_path=tmp_path / "runtime" / "project_bindings.json",
         telegram_ai_agent_root=bot_root,
         telegram_ai_agent_topic_config_path=bot_root / "topic_config.json",
         telegram_ai_agent_tmux_state_path=bot_root / "tmux_sessions" / "state.json",
-        telegram_ai_agent_compatibility_manifest=tmp_path / "compatibility.json",
         codex_usage_endpoint="https://chatgpt.com/backend-api/wham/usage",
         codex_binary=codex_binary,
         codex_auth_enrollment_root=tmp_path / "runtime" / "codex_auth_enrollments",
@@ -56,8 +59,7 @@ def _settings(tmp_path: Path) -> AppSettings:
         enable_provider_claude_code=False,
         enable_provider_gemini_cli=False,
         ai_project_roots=(tmp_path / "projects",),
-        project_settings_path=tmp_path / "runtime" / "project_settings_v2.json",
-        runtime_launch_specs_path=tmp_path / "runtime" / "runtime_launch_specs_v1.json",
+        runtime_control_path=tmp_path / "runtime" / "runtime_control_v1.json",
     )
 
 
@@ -149,14 +151,46 @@ def test_new_account_inherits_centrally_configured_project_trust(tmp_path: Path)
     settings = _settings(tmp_path)
     project = settings.ai_project_roots[0] / "study"
     project.mkdir(parents=True)
-    upsert_project_settings(
-        project_path=str(project),
-        provider_id="codex",
-        account_profile="codex_a",
-        model="gpt-5.6-sol",
-        reasoning_effort="high",
-        expected_revision=None,
-        settings=settings,
+    agent = AgentInstanceRecord(
+        agent_instance_id="agent-1",
+        pinned_upstream_sha="0" * 40,
+        telegram_bot_identity="bot-agent-1",
+        telegram_bot_token_fingerprint="sha256:" + "1" * 64,
+        forum_chat_id=-1001,
+        runtime_socket="/run/user/1000/ai-agent-runtime/agent-1/runtime.sock",
+    )
+    register_agent_instance(settings.runtime_control_path, agent)
+    material: dict[str, object] = {
+        "binding_id": "binding-1",
+        "agent_instance_id": "agent-1",
+        "generation_id": "generation-1",
+        "revision": 1,
+        "project_id": "project-study",
+        "canonical_cwd": str(project.resolve()),
+        "provider": "codex",
+        "account_profile": "codex_a",
+        "model": "gpt-5.6-sol",
+        "reasoning_effort": "high",
+    }
+    desired = DesiredSpecRecord(
+        **material,
+        spec_digest=canonical_digest(material),
+        source_kind="cus_ui",
+        source_ref="test",
+    )
+    upsert_runtime_binding(
+        settings.runtime_control_path,
+        RuntimeBindingRecord(
+            binding_id="binding-1",
+            agent_instance_id="agent-1",
+            chat_id=-1001,
+            thread_id=42,
+            topic_name="Study",
+            project_id="project-study",
+            canonical_cwd=str(project.resolve()),
+            desired=desired,
+            lifecycle_status="CONFIGURED",
+        ),
     )
     enrollment = start_codex_account_enrollment(
         "codex_b",

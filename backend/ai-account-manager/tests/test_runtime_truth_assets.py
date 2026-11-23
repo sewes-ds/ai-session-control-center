@@ -20,23 +20,12 @@ def _javascript_function(source: str, name: str) -> str:
     raise AssertionError(f"{name} function body not found")
 
 
-def test_runtime_selection_refresh_has_only_three_explicit_frontend_triggers() -> None:
+def test_runtime_truth_comes_only_from_binding_health() -> None:
     javascript = (MINIAPP / "assets" / "app.js").read_text(encoding="utf-8")
-    endpoint = _javascript_function(javascript, "runtimeSelectionRefresh")
-    initial = _javascript_function(javascript, "refreshInitialRuntimeSelections")
     manual = _javascript_function(javascript, "refreshProjectsState")
-    post_apply = _javascript_function(javascript, "confirmApplySettings")
-    loader = _javascript_function(javascript, "loadPrivateDataForCurrentAuth")
 
-    assert javascript.count("/api/sessions/runtime-selection/refresh") == 1
-    assert 'method: "POST"' in endpoint
-    assert initial.count("runtimeSelectionRefresh()") == 1
-    assert manual.count("runtimeSelectionRefresh()") == 1
-    assert 'loadProjects({ refreshRuntimeSelection: true })' in post_apply
-    assert "refreshRuntimeSelection\n          ? runtimeSelectionRefresh()" in javascript
-    assert "state.runtimeSelectionAutoRefreshGeneration !== generation" in loader
-    assert "state.runtimeSelectionAutoRefreshGeneration = generation" in loader
-    assert "void refreshInitialRuntimeSelections(generation)" in loader
+    assert 'apiRequest("/api/runtime/bindings/health")' in javascript
+    assert "loadProjects({ background: true })" in manual
 
 
 def test_poll_accounts_tabs_visibility_and_activation_do_not_probe_runtime_selection() -> None:
@@ -54,7 +43,6 @@ def test_poll_accounts_tabs_visibility_and_activation_do_not_probe_runtime_selec
 
     for function in unrelated:
         assert "runtimeSelectionRefresh" not in function
-        assert "/runtime-selection/refresh" not in function
     assert "loadProjects({ background: true })" in unrelated[0]
 
 
@@ -103,6 +91,6 @@ def test_runtime_truth_ui_has_no_source_timestamp_or_diff_disclosure() -> None:
 def test_runtime_truth_asset_version_is_deterministic() -> None:
     html = (MINIAPP / "index.html").read_text(encoding="utf-8")
 
-    assert './assets/app.css?v=cus-runtime-onboarding-v1' in html
-    assert './assets/app.js?v=cus-claude-deepseek-v1' in html
-    assert 'https://telegram.org/js/telegram-web-app.js?63' in html
+    assert "./assets/app.css?v=cus-runtime-onboarding-v1" in html
+    assert "./assets/app.js?v=cus-runtime-binding-v2" in html
+    assert "https://telegram.org/js/telegram-web-app.js?63" in html

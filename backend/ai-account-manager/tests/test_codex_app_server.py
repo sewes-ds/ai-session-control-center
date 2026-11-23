@@ -22,12 +22,12 @@ def _settings(tmp_path: Path, *, timeout: float = 2.0) -> AppSettings:
         ai_quota_cache_root=tmp_path / "quota_cache",
         runtime_data_root=tmp_path / "runtime",
         project_inventory_path=tmp_path / "runtime" / "project_inventory_v1.json",
-        project_activity_path=tmp_path / "runtime" / "project_activity_v1.json",
-        project_bindings_path=tmp_path / "runtime" / "project_bindings.json",
         telegram_ai_agent_root=tmp_path / "telegram-ai-agent",
         telegram_ai_agent_topic_config_path=tmp_path / "telegram-ai-agent" / "topic_config.json",
-        telegram_ai_agent_tmux_state_path=tmp_path / "telegram-ai-agent" / "tmux_sessions" / "state.json",
-        telegram_ai_agent_compatibility_manifest=tmp_path / "compatibility.json",
+        telegram_ai_agent_tmux_state_path=tmp_path
+        / "telegram-ai-agent"
+        / "tmux_sessions"
+        / "state.json",
         codex_usage_endpoint="https://example.invalid/usage",
         codex_binary=tmp_path / "bin" / "codex",
         codex_auth_enrollment_root=tmp_path / "runtime" / "codex_auth_enrollments",
@@ -54,7 +54,7 @@ def _fake_server(tmp_path: Path) -> Path:
     script = tmp_path / "fake_codex_server.py"
     script.write_text(
         textwrap.dedent(
-            r'''
+            r"""
             import json
             import os
             import pathlib
@@ -126,7 +126,7 @@ def _fake_server(tmp_path: Path) -> Path:
                         respond(rid, {"data": [{"id": "m2", "model": "m2", "displayName": "M2", "hidden": False, "isDefault": False, "defaultReasoningEffort": "high", "supportedReasoningEfforts": [{"reasoningEffort": "high"}]}], "nextCursor": None})
                     else:
                         respond(rid, {"data": [{"id": "m1", "model": "m1", "displayName": "M1", "hidden": False, "isDefault": True, "defaultReasoningEffort": "medium", "supportedReasoningEfforts": [{"reasoningEffort": "medium"}]}], "nextCursor": "cursor-2"})
-            '''
+            """
         ).strip()
         + "\n",
         encoding="utf-8",
@@ -252,6 +252,8 @@ def test_app_server_malformed_timeout_and_oversized_fail_safely(
     timeout_settings = _settings(tmp_path / "timeout-case", timeout=0.2)
     _profile(timeout_settings)
     factory, _calls = _runner(fake, tmp_path / "timeout-log.json", mode="timeout")
-    timeout = run_codex_app_server_probe("codex_a", settings=timeout_settings, process_factory=factory)
+    timeout = run_codex_app_server_probe(
+        "codex_a", settings=timeout_settings, process_factory=factory
+    )
     assert timeout.error_code == "timeout"
     assert timeout.temp_home_removed is True

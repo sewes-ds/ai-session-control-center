@@ -14,10 +14,10 @@ from ai_account_manager.core.project_onboarding import (
     ProjectOnboardingError,
     validate_onboarding_project_path,
 )
-from ai_account_manager.core.project_settings import (
-    ProjectSettingsError,
+from ai_account_manager.core.selection import (
+    SelectionError,
     project_id_for_path,
-    validate_provider_project_settings,
+    validate_provider_selection,
 )
 from ai_account_manager.core.project_trust import (
     ProjectTrustError,
@@ -197,7 +197,7 @@ async def apply_onboarding(
         return _configured_response(notified, binding)
     try:
         canonical_cwd = validate_onboarding_project_path(payload.project_path, settings)
-        validate_provider_project_settings(
+        validate_provider_selection(
             provider_id=payload.provider,
             account_profile=payload.account_profile,
             model=payload.model,
@@ -227,7 +227,7 @@ async def apply_onboarding(
         )
     except (
         ProjectOnboardingError,
-        ProjectSettingsError,
+        SelectionError,
         ProjectTrustError,
         RuntimeOnboardingError,
     ) as exc:

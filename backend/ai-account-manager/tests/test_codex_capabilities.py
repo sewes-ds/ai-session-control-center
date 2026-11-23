@@ -33,12 +33,12 @@ def _settings(tmp_path: Path) -> AppSettings:
         ai_quota_cache_root=tmp_path / "quota_cache",
         runtime_data_root=tmp_path / "runtime",
         project_inventory_path=tmp_path / "runtime" / "project_inventory_v1.json",
-        project_activity_path=tmp_path / "runtime" / "project_activity_v1.json",
-        project_bindings_path=tmp_path / "runtime" / "project_bindings.json",
         telegram_ai_agent_root=tmp_path / "telegram-ai-agent",
         telegram_ai_agent_topic_config_path=tmp_path / "telegram-ai-agent" / "topic_config.json",
-        telegram_ai_agent_tmux_state_path=tmp_path / "telegram-ai-agent" / "tmux_sessions" / "state.json",
-        telegram_ai_agent_compatibility_manifest=tmp_path / "compatibility.json",
+        telegram_ai_agent_tmux_state_path=tmp_path
+        / "telegram-ai-agent"
+        / "tmux_sessions"
+        / "state.json",
         codex_usage_endpoint="https://example.invalid/usage",
         codex_binary=tmp_path / "bin" / "codex",
         codex_auth_enrollment_root=tmp_path / "runtime" / "codex_auth_enrollments",
@@ -106,7 +106,11 @@ def _probe(slug: str, profile: Path, *, suffix: str = "") -> CodexAppServerProbe
                         "limitId": "codex",
                         "limitName": "Codex",
                         "planType": "plus",
-                        "primary": {"usedPercent": 25.5, "windowDurationMins": 300, "resetsAt": 123},
+                        "primary": {
+                            "usedPercent": 25.5,
+                            "windowDurationMins": 300,
+                            "resetsAt": 123,
+                        },
                     },
                     "rateLimitsByLimitId": {
                         "codex": {
@@ -173,8 +177,7 @@ def test_refresh_normalizes_models_rate_limits_reset_credits_and_safe_account(
 
     assert snapshot.status == "ok"
     assert snapshot.account.safe_identifier == (
-        "email_sha256:"
-        + hashlib.sha256("codex_a@example.com".encode()).hexdigest()[:12]
+        "email_sha256:" + hashlib.sha256("codex_a@example.com".encode()).hexdigest()[:12]
     )
     assert snapshot.account.email_masked == "c***a@E***e.COM"
     assert snapshot.models.items[0].supported_reasoning_efforts == ["high", "low"]
@@ -182,8 +185,9 @@ def test_refresh_normalizes_models_rate_limits_reset_credits_and_safe_account(
     assert len(snapshot.rate_limits.buckets) == 2
     assert snapshot.rate_limits.buckets[0].windows[0].remaining_percent == 74.5
     assert snapshot.rate_limits.reset_credits.available_count == 1
-    assert snapshot.rate_limits.reset_credits.items[0].credit_id_sha256_12 == (
-        hashlib.sha256("raw-reset-credit-id".encode()).hexdigest()[:12]
+    assert (
+        snapshot.rate_limits.reset_credits.items[0].credit_id_sha256_12
+        == (hashlib.sha256("raw-reset-credit-id".encode()).hexdigest()[:12])
     )
     assert "raw-reset-credit-id" not in payload
     assert "codex_a@Example.COM" not in payload
@@ -263,7 +267,10 @@ def test_capabilities_routes_return_expected_statuses(monkeypatch, tmp_path: Pat
     monkeypatch.setattr(codex_routes, "refresh_codex_capabilities", route_refresh)
     try:
         client = TestClient(create_app())
-        assert client.get("/api/providers/codex/accounts/missing_valid/capabilities").status_code == 404
+        assert (
+            client.get("/api/providers/codex/accounts/missing_valid/capabilities").status_code
+            == 404
+        )
         missing_cache = client.get("/api/providers/codex/accounts/codex_a/capabilities")
         assert missing_cache.status_code == 200
         assert missing_cache.json()["status"] == "not_refreshed"

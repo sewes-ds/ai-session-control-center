@@ -3,18 +3,9 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Any, Literal
 
 from ai_account_manager.core.config import AppSettings, get_settings
 
-OnboardingState = Literal["LEGACY", "UNCONFIGURED", "CONFIGURED"]
-REQUIRED_LAUNCH_FIELDS = (
-    "project_path",
-    "account_profile",
-    "model",
-    "reasoning_effort",
-    "runtime_launch_spec",
-)
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -78,37 +69,3 @@ def validate_onboarding_project_path(
             "Каталог недоступен владельцу сервиса.",
         )
     return str(resolved)
-
-
-def onboarding_missing_fields(
-    *,
-    project_path: str | None,
-    settings_record: dict[str, Any] | None,
-    runtime_record: dict[str, Any] | None,
-) -> list[str]:
-    missing: list[str] = []
-    if not project_path:
-        missing.append("project_path")
-    account = settings_record.get("account_profile") if settings_record else None
-    model = settings_record.get("model") if settings_record else None
-    reasoning = settings_record.get("reasoning_effort") if settings_record else None
-    if not isinstance(account, str) or not account:
-        missing.append("account_profile")
-    if not isinstance(model, str) or not model:
-        missing.append("model")
-    if not isinstance(reasoning, str) or not reasoning:
-        missing.append("reasoning_effort")
-    runtime_matches = bool(
-        runtime_record
-        and settings_record
-        and runtime_record.get("project_path") == project_path
-        and runtime_record.get("provider_id") == settings_record.get("provider_id")
-        and runtime_record.get("account_profile") == account
-        and runtime_record.get("model") == model
-        and runtime_record.get("reasoning_effort") == reasoning
-        and runtime_record.get("settings_revision") == settings_record.get("revision")
-        and isinstance(runtime_record.get("spec_sha256"), str)
-    )
-    if not runtime_matches:
-        missing.append("runtime_launch_spec")
-    return missing

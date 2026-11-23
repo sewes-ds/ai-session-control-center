@@ -26,7 +26,7 @@ from ai_account_manager.schemas.codex import (
     CodexCapabilityRateLimitsSection,
     CodexCapabilityUsageSection,
 )
-from ai_account_manager.schemas.sessions import ProjectSettingsValidationResponse
+from ai_account_manager.schemas.selection import ProviderSelectionValidationResponse
 
 ACCOUNT_SLUG = "deepseek_default"
 ACCOUNT_LABEL = "DeepSeek API"
@@ -185,13 +185,13 @@ def deepseek_capabilities(
     )
 
 
-def validate_deepseek_settings(
+def validate_deepseek_selection(
     *,
     account_profile: str,
     model: str,
     reasoning_effort: str,
     settings: AppSettings | None = None,
-) -> ProjectSettingsValidationResponse:
+) -> ProviderSelectionValidationResponse:
     snapshot = deepseek_capabilities(account_profile, settings=settings)
     selected = next((item for item in snapshot.models.items if item.model_id == model), None)
     if selected is None:
@@ -200,7 +200,7 @@ def validate_deepseek_settings(
         raise DeepSeekProviderError(
             "reasoning_not_supported", "Requested reasoning effort is not supported"
         )
-    return ProjectSettingsValidationResponse(
+    return ProviderSelectionValidationResponse(
         status="valid",
         provider_id="claude_code",
         account_profile=account_profile,

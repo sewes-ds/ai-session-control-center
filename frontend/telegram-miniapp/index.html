@@ -8,7 +8,7 @@
   <title>Центр управления сессиями</title>
   <link rel="stylesheet" href="./assets/app.css?v=cus-runtime-onboarding-v1">
   <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
-  <script defer src="./assets/app.js?v=cus-claude-deepseek-v1"></script>
+  <script defer src="./assets/app.js?v=cus-runtime-binding-v2"></script>
 </head>
 <body>
   <main id="topicOnboarding" class="onboarding-shell is-hidden" aria-labelledby="topicOnboardingTitle">
@@ -212,22 +212,6 @@
 
   <div id="projectSettingsDialog" class="dialog-backdrop is-hidden" role="dialog" aria-modal="true" aria-labelledby="projectSettingsDialogTitle">
     <section class="dialog-card">
-      <div id="settingsPathStep" class="is-hidden">
-        <p class="eyebrow">Новый проект</p>
-        <h2>Привязать каталог</h2>
-        <p class="dialog-copy">Укажите существующий серверный каталог проекта. До завершения всей настройки Codex не запускается.</p>
-        <label class="field">
-          <span>Абсолютный путь</span>
-          <input id="settingsPathInput" type="text" inputmode="text" autocomplete="off" placeholder="/srv/projects/example">
-          <small>Разрешены только каталоги внутри настроенных owner roots.</small>
-        </label>
-        <div id="settingsPathError" class="notice notice-error is-hidden" role="alert"></div>
-        <div class="dialog-actions">
-          <button id="bindProjectPathButton" class="button button-primary" type="button">Привязать путь</button>
-          <button class="button button-secondary" type="button" data-close-settings-dialog>Отмена</button>
-        </div>
-      </div>
-
       <div id="settingsEditStep" class="is-hidden">
         <p class="eyebrow">Codex</p>
         <h2 id="projectSettingsDialogTitle">Настроить запуск</h2>

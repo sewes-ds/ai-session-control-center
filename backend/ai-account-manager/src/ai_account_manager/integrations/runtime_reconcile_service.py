@@ -9,9 +9,9 @@ from typing import Any
 from urllib.parse import quote
 
 from ai_account_manager.core.config import AppSettings
-from ai_account_manager.core.project_settings import (
-    ProjectSettingsError,
-    validate_provider_project_settings,
+from ai_account_manager.core.selection import (
+    SelectionError,
+    validate_provider_selection,
 )
 from ai_account_manager.core.runtime_control import (
     acknowledge_project_relocation,
@@ -291,14 +291,14 @@ def observed_policy(
         proposal: ObservedSpecProposalRecord,
     ) -> bool:
         try:
-            validation = validate_provider_project_settings(
+            validation = validate_provider_selection(
                 provider_id=binding.desired.provider,
                 account_profile=binding.desired.account_profile,
                 model=proposal.model,
                 reasoning_effort=proposal.reasoning_effort,
                 settings=settings,
             )
-        except ProjectSettingsError:
+        except SelectionError:
             return False
         return validation.status == "valid"
 

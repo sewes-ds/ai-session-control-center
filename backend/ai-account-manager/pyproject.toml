@@ -18,8 +18,6 @@ Issues = "https://github.com/sewes-ds/ai-session-control-center/issues"
 
 [project.scripts]
 cus-codex-managed-profile-update = "ai_account_manager.providers.codex.managed_profile_update:main"
-cus-codex-reasoning-contract-reconcile = "ai_account_manager.providers.codex.reasoning_contract:main"
-cus-runtime-migration-import = "ai_account_manager.runtime_migration_importer:main"
 cus-runtime-agent-instance = "ai_account_manager.runtime_agent_instance:main"
 
 [project.optional-dependencies]

@@ -9,9 +9,9 @@ from ai_account_manager.auth.telegram_topic_access import (
     verify_forum_member_access,
 )
 from ai_account_manager.core.config import get_settings
-from ai_account_manager.core.project_settings import (
-    ProjectSettingsError,
-    validate_provider_project_settings,
+from ai_account_manager.core.selection import (
+    SelectionError,
+    validate_provider_selection,
 )
 from ai_account_manager.core.runtime_control import (
     RuntimeControlStoreError,
@@ -25,6 +25,10 @@ from ai_account_manager.integrations.ai_agent_runtime import (
 from ai_account_manager.integrations.runtime_health import collect_runtime_binding_health
 from ai_account_manager.schemas.runtime import RuntimePublicConfig
 from ai_account_manager.schemas.runtime_health import RuntimeBindingHealthResponse
+from ai_account_manager.schemas.selection import (
+    ProviderSelectionValidationRequest,
+    ProviderSelectionValidationResponse,
+)
 
 router = APIRouter(tags=["runtime"])
 
@@ -56,6 +60,29 @@ async def runtime_bindings_health() -> RuntimeBindingHealthResponse:
     )
 
 
+@router.post(
+    "/runtime/selection/validate",
+    response_model=ProviderSelectionValidationResponse,
+)
+def validate_selection(
+    payload: ProviderSelectionValidationRequest,
+) -> ProviderSelectionValidationResponse:
+    settings = get_settings()
+    try:
+        return validate_provider_selection(
+            provider_id=payload.provider_id,
+            account_profile=payload.account_profile,
+            model=payload.model,
+            reasoning_effort=payload.reasoning_effort,
+            settings=settings,
+        )
+    except SelectionError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+
+
 @router.post("/runtime/bindings/{binding_id}/selection")
 async def select_binding_profile(
     binding_id: str,
@@ -84,7 +111,7 @@ async def select_binding_profile(
             detail={"code": exc.code, "message": exc.message},
         ) from exc
     try:
-        validation = validate_provider_project_settings(
+        validation = validate_provider_selection(
             provider_id=payload.provider,
             account_profile=payload.account_profile,
             model=payload.model,
@@ -111,7 +138,7 @@ async def select_binding_profile(
             reasoning_effort=payload.reasoning_effort,
             source_ref=f"telegram-user:{principal.user_id}",
         )
-    except (ProjectSettingsError, RuntimeControlStoreError) as exc:
+    except (SelectionError, RuntimeControlStoreError) as exc:
         raise HTTPException(
             status_code=409,
             detail={"code": exc.code, "message": exc.message},

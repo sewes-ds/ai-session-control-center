@@ -122,7 +122,7 @@ def _validate_agent_instance_registration(
         if immutable_changed:
             raise RuntimeControlStoreError(
                 "agent_instance_identity_changed",
-                "AgentInstance bot/forum identity is immutable; use explicit migration",
+                "AgentInstance bot/forum identity is immutable; register a replacement explicitly",
             )
         release_changed = (
             existing.pinned_upstream_sha != record.pinned_upstream_sha
@@ -365,21 +365,21 @@ def prepare_project_relocation(
                 "project_relocation_pending",
                 "Project already has an incomplete relocation",
             )
-        project_bindings = tuple(
+        affected_bindings = tuple(
             binding
             for binding in store.bindings.values()
             if binding.project_id == project_id and binding.lifecycle_status != "ARCHIVED"
         )
-        if not project_bindings:
+        if not affected_bindings:
             raise RuntimeControlStoreError(
                 "project_relocation_invalid", "Project has no active Runtime Bindings"
             )
-        if any(binding.lifecycle_status != "CONFIGURED" for binding in project_bindings):
+        if any(binding.lifecycle_status != "CONFIGURED" for binding in affected_bindings):
             raise RuntimeControlStoreError(
                 "project_relocation_not_managed",
                 "Project relocation requires every active binding to be managed",
             )
-        if {binding.canonical_cwd for binding in project_bindings} != {old_cwd}:
+        if {binding.canonical_cwd for binding in affected_bindings} != {old_cwd}:
             raise RuntimeControlStoreError(
                 "project_relocation_stale",
                 "Project relocation old path does not match every active binding",
@@ -394,9 +394,9 @@ def prepare_project_relocation(
                 "project_relocation_collision",
                 "Project relocation target is already owned by another Project",
             )
-        binding_ids = tuple(sorted(binding.binding_id for binding in project_bindings))
+        binding_ids = tuple(sorted(binding.binding_id for binding in affected_bindings))
         agent_instance_ids = tuple(
-            sorted({binding.agent_instance_id for binding in project_bindings})
+            sorted({binding.agent_instance_id for binding in affected_bindings})
         )
         record = ProjectRelocationRecord(
             relocation_id=normalized_id,
@@ -408,7 +408,7 @@ def prepare_project_relocation(
             created_at=datetime.now(timezone.utc),
         )
         updated = store.model_copy(deep=True)
-        for binding in project_bindings:
+        for binding in affected_bindings:
             desired = binding.desired
             digest_payload = {
                 **desired.digest_payload(),

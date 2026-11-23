@@ -269,7 +269,9 @@ def _normalize_models(method: MethodResult, discovered_at: str) -> CodexCapabili
         items.append(
             CodexCapabilityModelItem(
                 model_id=model_id.strip(),
-                display_name=raw.get("displayName") if isinstance(raw.get("displayName"), str) else None,
+                display_name=raw.get("displayName")
+                if isinstance(raw.get("displayName"), str)
+                else None,
                 hidden=raw.get("hidden") if isinstance(raw.get("hidden"), bool) else None,
                 is_default=raw.get("isDefault") if isinstance(raw.get("isDefault"), bool) else None,
                 default_reasoning_effort=(
@@ -323,7 +325,9 @@ def _normalize_window(window_type: str, raw: Any) -> CodexCapabilityRateLimitWin
     )
 
 
-def _normalize_bucket(raw: Any, fallback_limit_id: str | None = None) -> CodexCapabilityRateLimitBucket | None:
+def _normalize_bucket(
+    raw: Any, fallback_limit_id: str | None = None
+) -> CodexCapabilityRateLimitBucket | None:
     if not isinstance(raw, dict):
         return None
     windows = []
@@ -344,7 +348,9 @@ def _normalize_bucket(raw: Any, fallback_limit_id: str | None = None) -> CodexCa
     )
 
 
-def _normalize_rate_limits(method: MethodResult, discovered_at: str) -> CodexCapabilityRateLimitsSection:
+def _normalize_rate_limits(
+    method: MethodResult, discovered_at: str
+) -> CodexCapabilityRateLimitsSection:
     if method.status != "ok" or not isinstance(method.result, dict):
         return CodexCapabilityRateLimitsSection(
             status="error",
@@ -380,8 +386,12 @@ def _normalize_rate_limits(method: MethodResult, discovered_at: str) -> CodexCap
                             if isinstance(raw_id, str)
                             else None
                         ),
-                        reset_type=credit.get("resetType") if isinstance(credit.get("resetType"), str) else None,
-                        status=credit.get("status") if isinstance(credit.get("status"), str) else None,
+                        reset_type=credit.get("resetType")
+                        if isinstance(credit.get("resetType"), str)
+                        else None,
+                        status=credit.get("status")
+                        if isinstance(credit.get("status"), str)
+                        else None,
                         granted_at=(
                             credit.get("grantedAt")
                             if isinstance(credit.get("grantedAt"), (int, str))
@@ -401,9 +411,9 @@ def _normalize_rate_limits(method: MethodResult, discovered_at: str) -> CodexCap
                     )
                 )
     credits_obj = None
-    legacy = method.result.get("rateLimits")
-    if isinstance(legacy, dict):
-        credits_obj = _json_safe_object(legacy.get("credits"))
+    compatibility_payload = method.result.get("rateLimits")
+    if isinstance(compatibility_payload, dict):
+        credits_obj = _json_safe_object(compatibility_payload.get("credits"))
     return CodexCapabilityRateLimitsSection(
         status="ok",
         discovered_at=discovered_at,
@@ -417,7 +427,9 @@ def _normalize_json_safe(value: Any) -> Any:
     if isinstance(value, dict):
         result = {}
         for key, item in value.items():
-            if isinstance(key, str) and not re.search("token|cookie|authorization|secret", key, re.I):
+            if isinstance(key, str) and not re.search(
+                "token|cookie|authorization|secret", key, re.I
+            ):
                 normalized = _normalize_json_safe(item)
                 if normalized is not None:
                     result[key] = normalized
@@ -509,16 +521,38 @@ def refresh_codex_capabilities(
             snapshot.error_message = "Codex profile auth metadata changed during probe"
             snapshot.status = _top_status(snapshot)
             return snapshot
-        account = _merge_section(previous.account, _normalize_account(probe.methods.get("account", MethodResult("error", error_code="not_run")), now))
-        models = _merge_section(previous.models, _normalize_models(probe.methods.get("models", MethodResult("error", error_code="not_run")), now))
-        rate_limits = _merge_section(previous.rate_limits, _normalize_rate_limits(probe.methods.get("rate_limits", MethodResult("error", error_code="not_run")), now))
-        usage = _merge_section(previous.usage, _normalize_usage(probe.methods.get("usage", MethodResult("error", error_code="not_run")), now))
+        account = _merge_section(
+            previous.account,
+            _normalize_account(
+                probe.methods.get("account", MethodResult("error", error_code="not_run")), now
+            ),
+        )
+        models = _merge_section(
+            previous.models,
+            _normalize_models(
+                probe.methods.get("models", MethodResult("error", error_code="not_run")), now
+            ),
+        )
+        rate_limits = _merge_section(
+            previous.rate_limits,
+            _normalize_rate_limits(
+                probe.methods.get("rate_limits", MethodResult("error", error_code="not_run")), now
+            ),
+        )
+        usage = _merge_section(
+            previous.usage,
+            _normalize_usage(
+                probe.methods.get("usage", MethodResult("error", error_code="not_run")), now
+            ),
+        )
         snapshot = CodexCapabilitiesSnapshot(
             account_profile=slug,
             profile_path=str(profile_dir),
             status="not_refreshed",
             refreshed_at=now,
-            last_success_at=now if any(section.status == "ok" for section in (account, models, rate_limits, usage)) else previous.last_success_at,
+            last_success_at=now
+            if any(section.status == "ok" for section in (account, models, rate_limits, usage))
+            else previous.last_success_at,
             profile_integrity_status=probe.profile_integrity_status,
             account=account,
             models=models,
